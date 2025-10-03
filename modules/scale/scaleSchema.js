@@ -2,6 +2,7 @@ const { gql } = require('apollo-server');
 
 module.exports = gql`
   extend type Query {
+    scaleCount(filter: ScaleFilter): ScaleCount
     scaleList(
       page: Int
       pageSize: Int
@@ -28,6 +29,10 @@ module.exports = gql`
     code: String
   }
 
+  type ScaleCount {
+    count: Int!
+  }
+
   type Scale {
     id: ID!
     name: String!
@@ -50,4 +55,3 @@ module.exports = gql`
     createdDate: DateFilter
   }
 `;
-

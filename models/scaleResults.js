@@ -1,9 +1,10 @@
 const { DataTypes } = require('sequelize');
 const Sequelize = require('sequelize');
 const sequelize = require('../db');
+const dayjs = require('dayjs');
 
-const ScaleAssignment = sequelize.define(
-  'scale_assignment',
+const ScaleResults = sequelize.define(
+  'scale_results',
   {
     id: {
       type: DataTypes.INTEGER,
@@ -20,14 +21,29 @@ const ScaleAssignment = sequelize.define(
         key: 'id',
       },
     },
-    productionOrderId: {
-      field: 'production_order_id',
+    deviceId: {
+      field: 'device_id',
+      type: DataTypes.STRING,
+      unique: true,
+      allowNull: false,
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    plantId: {
+      field: 'plant_id',
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'production_order',
+        model: 'plant',
         key: 'id',
       },
+    },
+    scaleBy: {
+      field: 'scale_by',
+      type: DataTypes.INTEGER,
+      allowNull: true,
     },
     createdAt: {
       field: 'created_at',
@@ -49,27 +65,27 @@ const ScaleAssignment = sequelize.define(
         return rawValue ? dayjs(rawValue).format('YYYY-MM-DD HH:mm:ss') : null;
       },
     },
-    deletedAt: {
-      field: 'deleted_at',
-      type: DataTypes.DATE,
-    },
   },
   {
     freezeTableName: true,
-    tableName: 'scale_assignment',
+    tableName: 'scale',
     paranoid: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ['device_id', 'plant_id'],
+      },
+    ],
   }
 );
 
-ScaleAssignment.associate = (models) => {
-  ScaleAssignment.belongsTo(models.Scale, {
+ScaleResults.associate = (models) => {
+  ScaleResults.belongsTo(models.Scale, { foreignKey: 'scaleId', as: 'scale' });
+
+  ScaleResults.hasMany(models.ScaleResultsAssignment, {
     foreignKey: 'scaleId',
-    as: 'scale',
-  });
-  ScaleAssignment.belongsTo(models.ProductionOrder, {
-    foreignKey: 'productionOrderId',
-    as: 'productionOrder',
+    as: 'scaleAssignments',
   });
 };
 
-module.exports = ScaleAssignment;
+module.exports = ScaleResults;

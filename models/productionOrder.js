@@ -2,8 +2,8 @@ const { DataTypes } = require('sequelize');
 const Sequelize = require('sequelize');
 const sequelize = require('../db');
 
-const ScaleAssignment = sequelize.define(
-  'scale_assignment',
+const ProductionOrder = sequelize.define(
+  'production_order',
   {
     id: {
       type: DataTypes.INTEGER,
@@ -11,22 +11,44 @@ const ScaleAssignment = sequelize.define(
       autoIncrement: true,
       allowNull: false,
     },
-    scaleId: {
-      field: 'scale_id',
+    productionOrderNumber: {
+      field: 'production_order_number',
+      type: DataTypes.STRING,
+      allowNull: false,
+      references: {
+        model: 'production_order_SAP',
+        key: 'production_order_number',
+      },
+    },
+    plantId: {
+      field: 'plant_id',
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'scale',
+        model: 'plant',
         key: 'id',
       },
     },
-    productionOrderId: {
-      field: 'production_order_id',
+    orderType: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    materialId: {
+      field: 'material_id',
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'production_order',
+        model: 'material',
         key: 'id',
+      },
+    },
+    productionDate: {
+      field: 'production_date',
+      type: DataTypes.DATE,
+      allowNull: false,
+      get() {
+        const rawValue = this.getDataValue('productionDate');
+        return rawValue ? dayjs(rawValue).format('YYYY-MM-DD HH:mm:ss') : null;
       },
     },
     createdAt: {
@@ -56,20 +78,26 @@ const ScaleAssignment = sequelize.define(
   },
   {
     freezeTableName: true,
-    tableName: 'scale_assignment',
+    tableName: 'production_order',
     paranoid: true,
   }
 );
 
-ScaleAssignment.associate = (models) => {
-  ScaleAssignment.belongsTo(models.Scale, {
-    foreignKey: 'scaleId',
-    as: 'scale',
-  });
-  ScaleAssignment.belongsTo(models.ProductionOrder, {
+ProductionOrder.associate = (models) => {
+  ProductionOrder.hasMany(models.ProductionOrderLine, {
     foreignKey: 'productionOrderId',
     as: 'productionOrder',
   });
+
+  ProductionOrder.belongsTo(models.Plant, {
+    foreignKey: 'plantId',
+    as: 'plant',
+  });
+
+  ProductionOrder.belongsTo(models.Material, {
+    foreignKey: 'materialId',
+    as: 'material',
+  });
 };
 
-module.exports = ScaleAssignment;
+module.exports = ProductionOrder;

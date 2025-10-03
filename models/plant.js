@@ -67,8 +67,12 @@ const Plant = sequelize.define(
 Plant.associate = (models) => {
   Plant.belongsTo(models.Company, { foreignKey: 'companyId', as: 'company' });
 
-  Plant.hasMany(models.Scale, { foreignKey: 'scaleId', as: 'scale' });
+  Plant.hasMany(models.Scale, { foreignKey: 'plantId', as: 'scale' });
+
+  Plant.hasMany(models.ProductionOrder, {
+    foreignKey: 'plantId',
+    as: 'productionOrder',
+  });
 };
 
 module.exports = Plant;
-

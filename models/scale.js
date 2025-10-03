@@ -12,7 +12,14 @@ const Scale = sequelize.define(
       autoIncrement: true,
       allowNull: false,
     },
+    deviceIP: {
+      field: 'device_IP',
+      type: DataTypes.STRING,
+      unique: true,
+      allowNull: false,
+    },
     deviceId: {
+      field: 'device_id',
       type: DataTypes.STRING,
       unique: true,
       allowNull: false,
@@ -58,7 +65,7 @@ const Scale = sequelize.define(
     indexes: [
       {
         unique: true,
-        fields: ['code', 'company_id'],
+        fields: ['device_id', 'plant_id'],
       },
     ],
   }
@@ -66,7 +73,11 @@ const Scale = sequelize.define(
 
 Scale.associate = (models) => {
   Scale.belongsTo(models.Plant, { foreignKey: 'plantId', as: 'plant' });
+
+  Scale.hasMany(models.ScaleAssignment, {
+    foreignKey: 'scaleId',
+    as: 'scaleAssignments',
+  });
 };
 
 module.exports = Scale;
-

@@ -1,9 +1,10 @@
 const { DataTypes } = require('sequelize');
 const Sequelize = require('sequelize');
 const sequelize = require('../db');
+const dayjs = require('dayjs');
 
-const ScaleAssignment = sequelize.define(
-  'scale_assignment',
+const Material = sequelize.define(
+  'material',
   {
     id: {
       type: DataTypes.INTEGER,
@@ -11,23 +12,30 @@ const ScaleAssignment = sequelize.define(
       autoIncrement: true,
       allowNull: false,
     },
-    scaleId: {
-      field: 'scale_id',
-      type: DataTypes.INTEGER,
+    code: {
+      type: DataTypes.STRING,
       allowNull: false,
-      references: {
-        model: 'scale',
-        key: 'id',
-      },
+      unique: true,
     },
-    productionOrderId: {
-      field: 'production_order_id',
-      type: DataTypes.INTEGER,
+    name: {
+      type: DataTypes.STRING,
       allowNull: false,
-      references: {
-        model: 'production_order',
-        key: 'id',
-      },
+    },
+    description: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    type: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    min: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    max: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
     },
     createdAt: {
       field: 'created_at',
@@ -49,27 +57,19 @@ const ScaleAssignment = sequelize.define(
         return rawValue ? dayjs(rawValue).format('YYYY-MM-DD HH:mm:ss') : null;
       },
     },
-    deletedAt: {
-      field: 'deleted_at',
-      type: DataTypes.DATE,
-    },
   },
   {
     freezeTableName: true,
-    tableName: 'scale_assignment',
+    tableName: 'material',
     paranoid: true,
   }
 );
 
-ScaleAssignment.associate = (models) => {
-  ScaleAssignment.belongsTo(models.Scale, {
-    foreignKey: 'scaleId',
-    as: 'scale',
-  });
-  ScaleAssignment.belongsTo(models.ProductionOrder, {
-    foreignKey: 'productionOrderId',
-    as: 'productionOrder',
+Material.associate = (models) => {
+  Material.hasMany(models.ProductionOrder, {
+    foreignKey: 'materialId',
+    as: 'productionOrders',
   });
 };
 
-module.exports = ScaleAssignment;
+module.exports = Material;

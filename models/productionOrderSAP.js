@@ -2,8 +2,8 @@ const { DataTypes } = require('sequelize');
 const Sequelize = require('sequelize');
 const sequelize = require('../db');
 
-const ScaleAssignment = sequelize.define(
-  'scale_assignment',
+const ProductionOrderSAP = sequelize.define(
+  'production_order_SAP',
   {
     id: {
       type: DataTypes.INTEGER,
@@ -11,23 +11,50 @@ const ScaleAssignment = sequelize.define(
       autoIncrement: true,
       allowNull: false,
     },
-    scaleId: {
-      field: 'scale_id',
-      type: DataTypes.INTEGER,
+    productionOrderNumber: {
+      field: 'production_order_number',
+      type: DataTypes.STRING,
       allowNull: false,
-      references: {
-        model: 'scale',
-        key: 'id',
-      },
+      unique: true,
     },
-    productionOrderId: {
-      field: 'production_order_id',
+    productionOrderType: {
+      field: 'production_order_type',
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+    },
+    plantCode: {
+      field: 'plant_code',
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    productionLocation: {
+      field: 'production_location',
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    processType: {
+      field: 'process_type',
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    orderType: {
+      field: 'order_type',
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    materialCode: {
+      field: 'material_code',
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    qty: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      references: {
-        model: 'production_order',
-        key: 'id',
-      },
+    },
+    uom: {
+      type: DataTypes.STRING,
+      allowNull: false,
     },
     createdAt: {
       field: 'created_at',
@@ -56,20 +83,9 @@ const ScaleAssignment = sequelize.define(
   },
   {
     freezeTableName: true,
-    tableName: 'scale_assignment',
+    tableName: 'production_order_SAP',
     paranoid: true,
   }
 );
 
-ScaleAssignment.associate = (models) => {
-  ScaleAssignment.belongsTo(models.Scale, {
-    foreignKey: 'scaleId',
-    as: 'scale',
-  });
-  ScaleAssignment.belongsTo(models.ProductionOrder, {
-    foreignKey: 'productionOrderId',
-    as: 'productionOrder',
-  });
-};
-
-module.exports = ScaleAssignment;
+module.exports = ProductionOrderSAP;

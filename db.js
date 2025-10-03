@@ -2,7 +2,7 @@ const { Sequelize } = require('sequelize');
 
 // Database configuration
 const sequelize = new Sequelize({
-  dialect: 'mysql', // or 'postgres', 'sqlite', 'mariadb', 'mssql'
+  dialect: 'postgres', // or 'postgres', 'sqlite', 'mariadb', 'mssql'
   host: process.env.DB_HOST || 'localhost',
   port: process.env.DB_PORT || 3306,
   database: process.env.DB_NAME || 'scale_monitor_system',
@@ -17,6 +17,8 @@ const sequelize = new Sequelize({
   },
 });
 
+console.log('GILA', process.env.DB_PORT);
+
 // Test database connection
 sequelize
   .authenticate()
@@ -28,5 +30,3 @@ sequelize
   });
 
 module.exports = sequelize;
-
-
