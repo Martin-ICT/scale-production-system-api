@@ -2,23 +2,14 @@ const { DataTypes } = require('sequelize');
 const Sequelize = require('sequelize');
 const sequelize = require('../db');
 
-const ProductionOrder = sequelize.define(
-  'production_order',
+const ProductionPlanning = sequelize.define(
+  'production_planning',
   {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
       allowNull: false,
-    },
-    productionOrderNumber: {
-      field: 'production_order_number',
-      type: DataTypes.STRING,
-      allowNull: false,
-      references: {
-        model: 'production_order_SAP',
-        key: 'production_order_number',
-      },
     },
     plantId: {
       field: 'plant_id',
@@ -29,25 +20,13 @@ const ProductionOrder = sequelize.define(
         key: 'id',
       },
     },
-    orderType: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    materialId: {
-      field: 'material_id',
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'material',
-        key: 'id',
-      },
-    },
-    productionDate: {
-      field: 'production_date',
+    planDate: {
+      field: 'plan_date',
       type: DataTypes.DATE,
+      defaultValue: Sequelize.NOW,
       allowNull: false,
       get() {
-        const rawValue = this.getDataValue('productionDate');
+        const rawValue = this.getDataValue('plantDate');
         return rawValue ? dayjs(rawValue).format('YYYY-MM-DD HH:mm:ss') : null;
       },
     },
@@ -78,26 +57,21 @@ const ProductionOrder = sequelize.define(
   },
   {
     freezeTableName: true,
-    tableName: 'production_order',
+    tableName: 'production_planning',
     paranoid: true,
   }
 );
 
-ProductionOrder.associate = (models) => {
-  ProductionOrder.hasMany(models.ProductionOrderLine, {
-    foreignKey: 'productionOrderId',
-    as: 'productionOrder',
+ProductionPlanning.associate = (models) => {
+  ProductionPlanning.hasMany(models.ProductionPlanningLine, {
+    foreignKey: 'productionPlanningId',
+    as: 'productionPlanning',
   });
 
-  ProductionOrder.belongsTo(models.Plant, {
+  ProductionPlanning.belongsTo(models.Plant, {
     foreignKey: 'plantId',
     as: 'plant',
   });
-
-  ProductionOrder.belongsTo(models.Material, {
-    foreignKey: 'materialId',
-    as: 'material',
-  });
 };
 
-module.exports = ProductionOrder;
+module.exports = ProductionPlanning;

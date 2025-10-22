@@ -1,6 +1,19 @@
 const { gql } = require('apollo-server');
 
 module.exports = gql`
+  enum ScaleCapacity {
+    _3KG
+    _6KG
+    _9KG
+    _12KG
+    _15KG
+  }
+
+  enum ScaleUOM {
+    KG
+    G
+  }
+
   extend type Query {
     scaleCount(filter: ScaleFilter): ScaleCount
     scaleList(
@@ -21,12 +34,24 @@ module.exports = gql`
 
   input ScaleInputCreate {
     name: String!
-    code: String!
+    deviceIP: String!
+    deviceId: String!
+    brand: String!
+    plantCode: String
+    uom: ScaleUOM!
+    capacity: ScaleCapacity!
+    lastCalibrate: DateTime
   }
 
   input ScaleInputUpdate {
     name: String
-    code: String
+    deviceIP: String
+    deviceId: String
+    brand: String
+    plantCode: String
+    uom: ScaleUOM
+    capacity: ScaleCapacity
+    lastCalibrate: DateTime
   }
 
   type ScaleCount {
@@ -36,22 +61,27 @@ module.exports = gql`
   type Scale {
     id: ID!
     name: String!
-    deviceId: String
-    status: String
-    plants: [Plant]
-    createdAt: String
-    updatedAt: String
+    deviceIP: String!
+    deviceId: String!
+    brand: String!
+    plantCode: String
+    capacity: ScaleCapacity!
+    uom: ScaleUOM!
+    lastCalibrate: DateTime
+    createdAt: DateTime
+    updatedAt: DateTime
+    deletedAt: DateTime
   }
 
   type ScalePagination {
-    companies: [Scale]
+    scales: [Scale]
     meta: PaginationMeta!
   }
 
   input ScaleFilter {
-    name: String
-    code: String
-    status: String
+    plantCode: String
+    capacity: ScaleCapacity
+    uom: ScaleUOM
     createdDate: DateFilter
   }
 `;

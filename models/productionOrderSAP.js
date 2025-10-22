@@ -15,32 +15,15 @@ const ProductionOrderSAP = sequelize.define(
       field: 'production_order_number',
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
-    },
-    productionOrderType: {
-      field: 'production_order_type',
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: true,
     },
     plantCode: {
       field: 'plant_code',
       type: DataTypes.STRING,
       allowNull: false,
     },
-    productionLocation: {
-      field: 'production_location',
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    processType: {
-      field: 'process_type',
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    orderType: {
-      field: 'order_type',
-      type: DataTypes.STRING,
+    orderTypeCode: {
+      field: 'order_type_code',
+      type: DataTypes.INTEGER,
       allowNull: false,
     },
     materialCode: {
@@ -48,12 +31,14 @@ const ProductionOrderSAP = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
-    qty: {
+    targetWeight: {
+      field: 'target_weight',
       type: DataTypes.INTEGER,
       allowNull: false,
     },
-    uom: {
-      type: DataTypes.STRING,
+    productionDate: {
+      field: 'production_date',
+      type: DataTypes.DATE,
       allowNull: false,
     },
     createdAt: {
@@ -61,30 +46,18 @@ const ProductionOrderSAP = sequelize.define(
       type: DataTypes.DATE,
       defaultValue: Sequelize.NOW,
       allowNull: false,
-      get() {
-        const rawValue = this.getDataValue('createdAt');
-        return rawValue ? dayjs(rawValue).format('YYYY-MM-DD HH:mm:ss') : null;
-      },
-    },
-    updatedAt: {
-      field: 'updated_at',
-      type: DataTypes.DATE,
-      defaultValue: Sequelize.NOW,
-      allowNull: false,
-      get() {
-        const rawValue = this.getDataValue('updatedAt');
-        return rawValue ? dayjs(rawValue).format('YYYY-MM-DD HH:mm:ss') : null;
-      },
-    },
-    deletedAt: {
-      field: 'deleted_at',
-      type: DataTypes.DATE,
     },
   },
   {
     freezeTableName: true,
     tableName: 'production_order_SAP',
-    paranoid: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ['production_order_number', 'material_code'],
+        name: 'unique_production_order_material',
+      },
+    ],
   }
 );
 

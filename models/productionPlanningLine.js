@@ -1,10 +1,9 @@
 const { DataTypes } = require('sequelize');
 const Sequelize = require('sequelize');
 const sequelize = require('../db');
-const dayjs = require('dayjs');
 
-const Material = sequelize.define(
-  'material',
+const ProductionPlanningLine = sequelize.define(
+  'production_planning_line',
   {
     id: {
       type: DataTypes.INTEGER,
@@ -12,31 +11,36 @@ const Material = sequelize.define(
       autoIncrement: true,
       allowNull: false,
     },
-    code: {
-      type: DataTypes.STRING,
+    productionPlanningId: {
+      field: 'production_planning_id',
+      type: DataTypes.INTEGER,
       allowNull: false,
-      unique: true,
+      references: {
+        model: 'production_planning',
+        key: 'id',
+      },
     },
-    name: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    description: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    type: {
+    materialCode: {
+      field: 'material_code',
       type: DataTypes.STRING,
       allowNull: false,
     },
-    min: {
-      type: DataTypes.FLOAT,
-      allowNull: true,
+    targetWeight: {
+      field: 'target_weight',
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
-    max: {
-      type: DataTypes.FLOAT,
-      allowNull: true,
+
+    orderTypeId: {
+      field: 'order_type_id',
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'order_type',
+        key: 'id',
+      },
     },
+
     createdAt: {
       field: 'created_at',
       type: DataTypes.DATE,
@@ -57,19 +61,23 @@ const Material = sequelize.define(
         return rawValue ? dayjs(rawValue).format('YYYY-MM-DD HH:mm:ss') : null;
       },
     },
+    deletedAt: {
+      field: 'deleted_at',
+      type: DataTypes.DATE,
+    },
   },
   {
     freezeTableName: true,
-    tableName: 'material',
+    tableName: 'production_planning_line',
     paranoid: true,
   }
 );
 
-Material.associate = (models) => {
-  Material.hasMany(models.ProductionOrder, {
-    foreignKey: 'materialId',
-    as: 'productionOrders',
+ProductionPlanningLine.associate = (models) => {
+  ProductionPlanningLine.belongsTo(models.OrderType, {
+    foreignKey: 'orderTypeId',
+    as: 'orderType',
   });
 };
 
-module.exports = Material;
+module.exports = ProductionPlanningLine;

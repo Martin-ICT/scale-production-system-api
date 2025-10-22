@@ -7,7 +7,6 @@ const pageMinCheckAndPageSizeMax = require('../../middlewares/pageMinCheckAndPag
 const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const Plant = require('../../models/plant');
-const Company = require('../../models/company');
 const hasPermission = require('../../middlewares/hasPermission');
 
 const validationSchemas = {

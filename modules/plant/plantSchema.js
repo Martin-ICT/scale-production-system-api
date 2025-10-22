@@ -22,14 +22,12 @@ module.exports = gql`
     name: String!
     code: String!
     address: String!
-    companyId: ID!
   }
 
   input PlantInputUpdate {
     code: String!
     name: String
     address: String
-    companyId: ID!
   }
 
   type Plant {
@@ -37,10 +35,6 @@ module.exports = gql`
     name: String!
     code: String
     address: String
-
-    # company
-    companyId: ID
-    company: Company
 
     createdAt: String
     updatedAt: String
@@ -55,7 +49,6 @@ module.exports = gql`
     userId: ID
     name: String
     description: String
-    companyId: ID
     status: String
     createdDate: DateFilter
   }

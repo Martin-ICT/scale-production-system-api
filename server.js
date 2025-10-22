@@ -11,7 +11,16 @@ const server = new ApolloServer({
   typeDefs,
   resolvers,
   introspection: true,
-  playground: true,
+  // Force local embedded sandbox (tidak redirect ke Apollo Studio)
+  plugins: [
+    require('apollo-server-core').ApolloServerPluginLandingPageLocalDefault({
+      embed: true,
+    }),
+  ],
+  cors: {
+    origin: '*', // Allow all origins for development
+    credentials: true,
+  },
   //   context: async ({ req }) => {
   //     try {
   //       const { user } = await authenticate({ req });
@@ -47,7 +56,8 @@ const server = new ApolloServer({
 });
 
 models.sequelize
-  .sync({ force: false })
+  // .sync({ force: true })
+  .sync()
   .then(() => {
     console.log('Database connected and models synced!');
     server.listen(5000, '0.0.0.0').then(({ url }) => {
@@ -57,4 +67,3 @@ models.sequelize
   .catch((err) => {
     console.error('Failed to sync database:', err);
   });
-

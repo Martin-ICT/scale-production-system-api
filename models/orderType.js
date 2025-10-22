@@ -1,9 +1,10 @@
 const { DataTypes } = require('sequelize');
 const Sequelize = require('sequelize');
 const sequelize = require('../db');
+const dayjs = require('dayjs');
 
-const Company = sequelize.define(
-  'company',
+const OrderType = sequelize.define(
+  'order_type',
   {
     id: {
       type: DataTypes.INTEGER,
@@ -15,16 +16,6 @@ const Company = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
-    },
-    code: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: true,
-    },
-    status: {
-      type: DataTypes.ENUM('Active', 'Inactive'),
-      defaultValue: 'Active',
-      allowNull: true,
     },
     createdAt: {
       field: 'created_at',
@@ -53,20 +44,9 @@ const Company = sequelize.define(
   },
   {
     freezeTableName: true,
-    tableName: 'company',
+    tableName: 'order_type',
     paranoid: true,
-    indexes: [
-      {
-        unique: true,
-        fields: ['name', 'code'],
-      },
-    ],
   }
 );
 
-Company.associate = (models) => {
-  Company.hasMany(models.Plant, { foreignKey: 'companyId', as: 'plants' });
-};
-
-module.exports = Company;
-
+module.exports = OrderType;

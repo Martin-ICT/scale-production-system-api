@@ -1,14 +1,20 @@
 const { Sequelize } = require('sequelize');
 
 // Database configuration
-const sequelize = new Sequelize({
+const config = {
   dialect: 'postgres', // or 'postgres', 'sqlite', 'mariadb', 'mssql'
   host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 3306,
+  port: process.env.DB_PORT || 5432,
   database: process.env.DB_NAME || 'scale_monitor_system',
   username: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
-  logging: false, // Set to console.log to see SQL queries
+  logging: console.log, // Enable logging to see SQL queries
+};
+
+console.log('🔍 Database Config:', config);
+
+const sequelize = new Sequelize({
+  ...config,
   pool: {
     max: 5,
     min: 0,
@@ -16,8 +22,6 @@ const sequelize = new Sequelize({
     idle: 10000,
   },
 });
-
-console.log('GILA', process.env.DB_PORT);
 
 // Test database connection
 sequelize

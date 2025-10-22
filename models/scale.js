@@ -1,7 +1,6 @@
 const { DataTypes } = require('sequelize');
 const Sequelize = require('sequelize');
 const sequelize = require('../db');
-const dayjs = require('dayjs');
 
 const Scale = sequelize.define(
   'scale',
@@ -13,7 +12,7 @@ const Scale = sequelize.define(
       allowNull: false,
     },
     deviceIP: {
-      field: 'device_IP',
+      field: 'device_ip',
       type: DataTypes.STRING,
       unique: true,
       allowNull: false,
@@ -28,52 +27,54 @@ const Scale = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
-    plantId: {
-      field: 'plant_id',
-      type: DataTypes.INTEGER,
+    brand: {
+      type: DataTypes.STRING,
       allowNull: false,
-      references: {
-        model: 'plant',
-        key: 'id',
-      },
+    },
+    plantCode: {
+      field: 'plant_code',
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    uom: {
+      type: DataTypes.ENUM('kg', 'g'),
+      allowNull: false,
+    },
+    capacity: {
+      type: DataTypes.ENUM('3', '6', '9', '12', '15'),
+      allowNull: false,
+      comment: 'Scale capacity in kilograms',
+    },
+    lastCalibrate: {
+      field: 'last_calibrate',
+      type: DataTypes.DATE,
+      allowNull: true,
     },
     createdAt: {
       field: 'created_at',
       type: DataTypes.DATE,
       defaultValue: Sequelize.NOW,
       allowNull: false,
-      get() {
-        const rawValue = this.getDataValue('createdAt');
-        return rawValue ? dayjs(rawValue).format('YYYY-MM-DD HH:mm:ss') : null;
-      },
     },
     updatedAt: {
       field: 'updated_at',
       type: DataTypes.DATE,
       defaultValue: Sequelize.NOW,
       allowNull: false,
-      get() {
-        const rawValue = this.getDataValue('updatedAt');
-        return rawValue ? dayjs(rawValue).format('YYYY-MM-DD HH:mm:ss') : null;
-      },
+    },
+    deletedAt: {
+      field: 'deleted_at',
+      type: DataTypes.DATE,
     },
   },
   {
     freezeTableName: true,
     tableName: 'scale',
     paranoid: true,
-    indexes: [
-      {
-        unique: true,
-        fields: ['device_id', 'plant_id'],
-      },
-    ],
   }
 );
 
 Scale.associate = (models) => {
-  Scale.belongsTo(models.Plant, { foreignKey: 'plantId', as: 'plant' });
-
   Scale.hasMany(models.ScaleAssignment, {
     foreignKey: 'scaleId',
     as: 'scaleAssignments',

@@ -5,9 +5,15 @@ const {
   PhoneNumberResolver,
 } = require('graphql-scalars');
 
-const companyResolver = require('./modules/company/companyResolver');
 // const plantResolver = require('./modules/plant/resolver');
 const scaleResolver = require('./modules/scale/scaleResolver');
+const productionOrderSAPResolver = require('./modules/productionOrderSAP/productionOrderSAPResolver');
+const packingGroupResolver = require('./modules/packingGroup/packingGroupResolver');
+const packingShiftResolver = require('./modules/packingShift/packingShiftResolver');
+const productionLotResolver = require('./modules/productionLot/productionLotResolver');
+const productionGroupResolver = require('./modules/productionGroup/productionGroupResolver');
+const productionShiftResolver = require('./modules/productionShift/productionShiftResolver');
+const storageLocationResolver = require('./modules/storageLocation/storageLocationResolver');
 
 module.exports = {
   DateTime: GraphQLDateTime,
@@ -16,13 +22,25 @@ module.exports = {
   EmailAddress: EmailAddressResolver,
   PhoneNumber: PhoneNumberResolver,
   Query: {
-    ...companyResolver.Query,
     // ...plantResolver.Query,
     ...scaleResolver.Query,
+    ...productionOrderSAPResolver.Query,
+    ...packingGroupResolver.Query,
+    ...packingShiftResolver.Query,
+    ...productionLotResolver.Query,
+    ...productionGroupResolver.Query,
+    ...productionShiftResolver.Query,
+    ...storageLocationResolver.Query,
   },
   Mutation: {
-    ...companyResolver.Mutation,
     // ...plantResolver.Mutation,
     ...scaleResolver.Mutation,
+    ...productionOrderSAPResolver.Mutation,
+    ...packingGroupResolver.Mutation,
+    ...packingShiftResolver.Mutation,
+    ...productionLotResolver.Mutation,
+    ...productionGroupResolver.Mutation,
+    ...productionShiftResolver.Mutation,
+    ...storageLocationResolver.Mutation,
   },
 };

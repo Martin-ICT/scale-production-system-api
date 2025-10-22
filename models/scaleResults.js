@@ -12,38 +12,18 @@ const ScaleResults = sequelize.define(
       autoIncrement: true,
       allowNull: false,
     },
-    scaleId: {
-      field: 'scale_id',
+    scaleAssignmentId: {
+      field: 'scale_assignment_id',
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'scale',
+        model: 'scale_assignment',
         key: 'id',
       },
     },
-    deviceId: {
-      field: 'device_id',
-      type: DataTypes.STRING,
-      unique: true,
-      allowNull: false,
-    },
-    name: {
+    recipient: {
       type: DataTypes.STRING,
       allowNull: false,
-    },
-    plantId: {
-      field: 'plant_id',
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'plant',
-        key: 'id',
-      },
-    },
-    scaleBy: {
-      field: 'scale_by',
-      type: DataTypes.INTEGER,
-      allowNull: true,
     },
     createdAt: {
       field: 'created_at',
@@ -68,23 +48,15 @@ const ScaleResults = sequelize.define(
   },
   {
     freezeTableName: true,
-    tableName: 'scale',
+    tableName: 'scale_results',
     paranoid: true,
-    indexes: [
-      {
-        unique: true,
-        fields: ['device_id', 'plant_id'],
-      },
-    ],
   }
 );
 
 ScaleResults.associate = (models) => {
-  ScaleResults.belongsTo(models.Scale, { foreignKey: 'scaleId', as: 'scale' });
-
-  ScaleResults.hasMany(models.ScaleResultsAssignment, {
-    foreignKey: 'scaleId',
-    as: 'scaleAssignments',
+  ScaleResults.belongsTo(models.ScaleAssignment, {
+    foreignKey: 'scaleAssignmentId',
+    as: 'scaleAssignment',
   });
 };
 

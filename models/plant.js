@@ -25,15 +25,6 @@ const Plant = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
-    companyId: {
-      field: 'company_id',
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'company',
-        key: 'id',
-      },
-    },
     createdAt: {
       field: 'created_at',
       type: DataTypes.DATE,
@@ -58,21 +49,14 @@ const Plant = sequelize.define(
     indexes: [
       {
         unique: true,
-        fields: ['code', 'company_id'],
+        fields: ['code'],
       },
     ],
   }
 );
 
 Plant.associate = (models) => {
-  Plant.belongsTo(models.Company, { foreignKey: 'companyId', as: 'company' });
-
   Plant.hasMany(models.Scale, { foreignKey: 'plantId', as: 'scale' });
-
-  Plant.hasMany(models.ProductionOrder, {
-    foreignKey: 'plantId',
-    as: 'productionOrder',
-  });
 };
 
 module.exports = Plant;
