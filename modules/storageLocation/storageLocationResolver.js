@@ -8,13 +8,16 @@ const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const StorageLocation = require('../../models/storageLocation');
 const hasPermission = require('../../middlewares/hasPermission');
+const isAuthenticated = require('../../middlewares/isAuthenticated');
 
 const validationSchemas = {
   storageLocationCreate: Joi.object({
+    code: Joi.string().required(),
     name: Joi.string().required(),
   }),
   storageLocationUpdate: Joi.object({
     id: Joi.number().integer().required(),
+    code: Joi.string().required(),
     name: Joi.string().required(),
   }),
   storageLocationDelete: Joi.object({
@@ -34,6 +37,8 @@ const validateInput = (schema, data) => {
 module.exports = {
   Query: {
     storageLocationList: combineResolvers(
+
+      isAuthenticated,
       // hasPermission('storageLocation.read'),
       pageMinCheckAndPageSizeMax,
       async (
@@ -52,8 +57,14 @@ module.exports = {
           if (search) {
             whereClause = definedSearch({
               query: search,
-              inColumns: ['name'],
+              inColumns: ['code', 'name'],
             });
+          }
+
+          if (filter?.code) {
+            whereClause.code = {
+              [Sequelize.Op.like]: `%${filter.code}%`,
+            };
           }
 
           if (filter?.name) {
@@ -91,6 +102,9 @@ module.exports = {
     ),
 
     storageLocationDetail: combineResolvers(
+
+
+      isAuthenticated,
       // hasPermission('storageLocation.read'),
       async (_, { id }) => {
         try {
@@ -113,6 +127,8 @@ module.exports = {
 
   Mutation: {
     storageLocationCreate: combineResolvers(
+
+      isAuthenticated,
       // hasPermission('storageLocation.create'),
       async (_, { input }) => {
         validateInput(validationSchemas.storageLocationCreate, input);
@@ -122,13 +138,13 @@ module.exports = {
         try {
           const existingStorageLocation = await StorageLocation.findOne({
             where: {
-              name: input.name,
+              [Sequelize.Op.or]: [{ code: input.code }, { name: input.name }],
             },
           });
 
           if (existingStorageLocation) {
             throw new ApolloError(
-              'A storage location with the same name already exists',
+              'A storage location with the same code or name already exists',
               apolloErrorCodes.BAD_DATA_VALIDATION
             );
           }
@@ -147,6 +163,9 @@ module.exports = {
     ),
 
     storageLocationUpdate: combineResolvers(
+
+
+      isAuthenticated,
       // hasPermission('storageLocation.update'),
       async (_, { id, input }) => {
         validateInput(validationSchemas.storageLocationUpdate, {
@@ -165,17 +184,20 @@ module.exports = {
             );
           }
 
-          if (input.name && input.name !== storageLocation.name) {
+          if (
+            (input.code && input.code !== storageLocation.code) ||
+            (input.name && input.name !== storageLocation.name)
+          ) {
             const existingStorageLocation = await StorageLocation.findOne({
               where: {
-                name: input.name,
+                [Sequelize.Op.or]: [{ code: input.code }, { name: input.name }],
                 id: { [Sequelize.Op.ne]: id },
               },
             });
 
             if (existingStorageLocation) {
               throw new ApolloError(
-                'A storage location with the same name already exists',
+                'A storage location with the same code or name already exists',
                 apolloErrorCodes.BAD_DATA_VALIDATION
               );
             }
@@ -193,6 +215,9 @@ module.exports = {
     ),
 
     storageLocationDelete: combineResolvers(
+
+
+      isAuthenticated,
       // hasPermission('storageLocation.delete'),
       async (_, { id }) => {
         validateInput(validationSchemas.storageLocationDelete, { id });
@@ -221,4 +246,3 @@ module.exports = {
     ),
   },
 };
-

@@ -22,15 +22,18 @@ module.exports = gql`
   }
 
   input ProductionGroupInputCreate {
+    code: String!
     name: String!
   }
 
   input ProductionGroupInputUpdate {
+    code: String
     name: String
   }
 
   type ProductionGroup {
     id: ID!
+    code: String!
     name: String!
   }
 
@@ -40,7 +43,7 @@ module.exports = gql`
   }
 
   input ProductionGroupFilter {
+    code: String
     name: String
   }
 `;
-

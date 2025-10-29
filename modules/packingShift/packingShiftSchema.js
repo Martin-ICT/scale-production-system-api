@@ -19,15 +19,18 @@ module.exports = gql`
   }
 
   input PackingShiftInputCreate {
+    code: String!
     name: String!
   }
 
   input PackingShiftInputUpdate {
+    code: String
     name: String
   }
 
   type PackingShift {
     id: ID!
+    code: String!
     name: String!
   }
 
@@ -37,7 +40,7 @@ module.exports = gql`
   }
 
   input PackingShiftFilter {
+    code: String
     name: String
   }
 `;
-

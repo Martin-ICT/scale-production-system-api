@@ -6,6 +6,7 @@ const {
 } = require('graphql-scalars');
 
 // const plantResolver = require('./modules/plant/resolver');
+const authResolver = require('./modules/auth/authResolver');
 const scaleResolver = require('./modules/scale/scaleResolver');
 const productionOrderSAPResolver = require('./modules/productionOrderSAP/productionOrderSAPResolver');
 const packingGroupResolver = require('./modules/packingGroup/packingGroupResolver');
@@ -14,6 +15,10 @@ const productionLotResolver = require('./modules/productionLot/productionLotReso
 const productionGroupResolver = require('./modules/productionGroup/productionGroupResolver');
 const productionShiftResolver = require('./modules/productionShift/productionShiftResolver');
 const storageLocationResolver = require('./modules/storageLocation/storageLocationResolver');
+const orderTypeResolver = require('./modules/orderType/orderTypeResolver');
+const materialResolver = require('./modules/material/materialResolver');
+const materialOrderTypeResolver = require('./modules/materialOrderType/materialOrderTypeResolver');
+const elementValueResolver = require('./modules/elementValue/elementValueResolver');
 
 module.exports = {
   DateTime: GraphQLDateTime,
@@ -23,6 +28,7 @@ module.exports = {
   PhoneNumber: PhoneNumberResolver,
   Query: {
     // ...plantResolver.Query,
+    ...authResolver.Query,
     ...scaleResolver.Query,
     ...productionOrderSAPResolver.Query,
     ...packingGroupResolver.Query,
@@ -31,9 +37,18 @@ module.exports = {
     ...productionGroupResolver.Query,
     ...productionShiftResolver.Query,
     ...storageLocationResolver.Query,
+    ...orderTypeResolver.Query,
+    ...materialResolver.Query,
+    ...materialOrderTypeResolver.Query,
+    ...elementValueResolver.Query,
+    ...scaleResolver.Query,
+  },
+  Material: {
+    ...materialResolver.Material,
   },
   Mutation: {
     // ...plantResolver.Mutation,
+    ...authResolver.Mutation,
     ...scaleResolver.Mutation,
     ...productionOrderSAPResolver.Mutation,
     ...packingGroupResolver.Mutation,
@@ -42,5 +57,7 @@ module.exports = {
     ...productionGroupResolver.Mutation,
     ...productionShiftResolver.Mutation,
     ...storageLocationResolver.Mutation,
+    ...orderTypeResolver.Mutation,
+    ...scaleResolver.Mutation,
   },
 };

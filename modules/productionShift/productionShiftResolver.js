@@ -8,13 +8,16 @@ const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const ProductionShift = require('../../models/productionShift');
 const hasPermission = require('../../middlewares/hasPermission');
+const isAuthenticated = require('../../middlewares/isAuthenticated');
 
 const validationSchemas = {
   productionShiftCreate: Joi.object({
+    code: Joi.string().required(),
     name: Joi.string().required(),
   }),
   productionShiftUpdate: Joi.object({
     id: Joi.number().integer().required(),
+    code: Joi.string().required(),
     name: Joi.string().required(),
   }),
   productionShiftDelete: Joi.object({
@@ -34,6 +37,7 @@ const validateInput = (schema, data) => {
 module.exports = {
   Query: {
     productionShiftList: combineResolvers(
+      isAuthenticated,
       // hasPermission('productionShift.read'),
       pageMinCheckAndPageSizeMax,
       async (
@@ -52,8 +56,14 @@ module.exports = {
           if (search) {
             whereClause = definedSearch({
               query: search,
-              inColumns: ['name'],
+              inColumns: ['code', 'name'],
             });
+          }
+
+          if (filter?.code) {
+            whereClause.code = {
+              [Sequelize.Op.like]: `%${filter.code}%`,
+            };
           }
 
           if (filter?.name) {
@@ -91,6 +101,7 @@ module.exports = {
     ),
 
     productionShiftDetail: combineResolvers(
+      isAuthenticated,
       // hasPermission('productionShift.read'),
       async (_, { id }) => {
         try {
@@ -113,6 +124,7 @@ module.exports = {
 
   Mutation: {
     productionShiftCreate: combineResolvers(
+      isAuthenticated,
       // hasPermission('productionShift.create'),
       async (_, { input }) => {
         validateInput(validationSchemas.productionShiftCreate, input);
@@ -122,13 +134,13 @@ module.exports = {
         try {
           const existingProductionShift = await ProductionShift.findOne({
             where: {
-              name: input.name,
+              [Sequelize.Op.or]: [{ code: input.code }, { name: input.name }],
             },
           });
 
           if (existingProductionShift) {
             throw new ApolloError(
-              'A production shift with the same name already exists',
+              'A production shift with the same code or name already exists',
               apolloErrorCodes.BAD_DATA_VALIDATION
             );
           }
@@ -147,6 +159,7 @@ module.exports = {
     ),
 
     productionShiftUpdate: combineResolvers(
+      isAuthenticated,
       // hasPermission('productionShift.update'),
       async (_, { id, input }) => {
         validateInput(validationSchemas.productionShiftUpdate, {
@@ -165,17 +178,20 @@ module.exports = {
             );
           }
 
-          if (input.name && input.name !== productionShift.name) {
+          if (
+            (input.code && input.code !== productionShift.code) ||
+            (input.name && input.name !== productionShift.name)
+          ) {
             const existingProductionShift = await ProductionShift.findOne({
               where: {
-                name: input.name,
+                [Sequelize.Op.or]: [{ code: input.code }, { name: input.name }],
                 id: { [Sequelize.Op.ne]: id },
               },
             });
 
             if (existingProductionShift) {
               throw new ApolloError(
-                'A production shift with the same name already exists',
+                'A production shift with the same code or name already exists',
                 apolloErrorCodes.BAD_DATA_VALIDATION
               );
             }
@@ -193,6 +209,7 @@ module.exports = {
     ),
 
     productionShiftDelete: combineResolvers(
+      isAuthenticated,
       // hasPermission('productionShift.delete'),
       async (_, { id }) => {
         validateInput(validationSchemas.productionShiftDelete, { id });
@@ -221,4 +238,3 @@ module.exports = {
     ),
   },
 };
-

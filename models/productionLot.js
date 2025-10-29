@@ -12,7 +12,7 @@ const ProductionLot = sequelize.define(
       autoIncrement: true,
       allowNull: false,
     },
-    name: {
+    code: {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
@@ -21,6 +21,7 @@ const ProductionLot = sequelize.define(
   {
     freezeTableName: true,
     tableName: 'production_lot',
+    timestamps: false,
   }
 );
 

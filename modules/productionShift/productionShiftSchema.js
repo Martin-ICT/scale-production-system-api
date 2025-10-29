@@ -22,15 +22,18 @@ module.exports = gql`
   }
 
   input ProductionShiftInputCreate {
+    code: String!
     name: String!
   }
 
   input ProductionShiftInputUpdate {
+    code: String
     name: String
   }
 
   type ProductionShift {
     id: ID!
+    code: String!
     name: String!
   }
 
@@ -40,7 +43,7 @@ module.exports = gql`
   }
 
   input ProductionShiftFilter {
+    code: String
     name: String
   }
 `;
-

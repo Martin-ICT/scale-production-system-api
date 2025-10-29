@@ -20,12 +20,12 @@ const ScaleAssignment = sequelize.define(
         key: 'id',
       },
     },
-    goodReceiveId: {
-      field: 'good_receive_id',
+    productionOrderDetailId: {
+      field: 'production_order_detail_id',
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'good_receive',
+        model: 'production_order_detail',
         key: 'id',
       },
     },
@@ -66,9 +66,9 @@ ScaleAssignment.associate = (models) => {
     foreignKey: 'scaleId',
     as: 'scale',
   });
-  ScaleAssignment.belongsTo(models.GoodReceive, {
-    foreignKey: 'goodReceiveId',
-    as: 'goodReceive',
+  ScaleAssignment.belongsTo(models.ProductionOrderDetail, {
+    foreignKey: 'productionOrderDetailId',
+    as: 'productionOrderDetail',
   });
 };
 

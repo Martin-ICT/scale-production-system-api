@@ -2,7 +2,6 @@ require('dotenv').config();
 const { ApolloServer, ApolloError } = require('apollo-server');
 const typeDefs = require('./schemas');
 const resolvers = require('./resolvers');
-// const User = require('./models/user');
 const authenticate = require('./middlewares/authenticate');
 const models = require('./models');
 const { Op } = require('sequelize');
@@ -21,18 +20,14 @@ const server = new ApolloServer({
     origin: '*', // Allow all origins for development
     credentials: true,
   },
-  //   context: async ({ req }) => {
-  //     try {
-  //       const { user } = await authenticate({ req });
-  //       const currentUser = await handleRoleAndPermission(user);
-  //       return {
-  //         models,
-  //         user: currentUser,
-  //       };
-  //     } catch {
-  //       throw new ApolloError('Session expired. Please log in again.');
-  //     }
-  //   },
+  context: async ({ req }) => {
+    const { user, authError } = await authenticate({ req });
+    return {
+      models,
+      user,
+      authError,
+    };
+  },
   formatError: (err) => {
     // Tangkap SequelizeUniqueConstraintError dari `originalError`
     const original = err.originalError;

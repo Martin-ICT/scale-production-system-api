@@ -8,13 +8,16 @@ const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const ProductionGroup = require('../../models/productionGroup');
 const hasPermission = require('../../middlewares/hasPermission');
+const isAuthenticated = require('../../middlewares/isAuthenticated');
 
 const validationSchemas = {
   productionGroupCreate: Joi.object({
+    code: Joi.string().required(),
     name: Joi.string().required(),
   }),
   productionGroupUpdate: Joi.object({
     id: Joi.number().integer().required(),
+    code: Joi.string().required(),
     name: Joi.string().required(),
   }),
   productionGroupDelete: Joi.object({
@@ -34,6 +37,7 @@ const validateInput = (schema, data) => {
 module.exports = {
   Query: {
     productionGroupList: combineResolvers(
+      isAuthenticated,
       // hasPermission('productionGroup.read'),
       pageMinCheckAndPageSizeMax,
       async (
@@ -52,8 +56,14 @@ module.exports = {
           if (search) {
             whereClause = definedSearch({
               query: search,
-              inColumns: ['name'],
+              inColumns: ['code', 'name'],
             });
+          }
+
+          if (filter?.code) {
+            whereClause.code = {
+              [Sequelize.Op.like]: `%${filter.code}%`,
+            };
           }
 
           if (filter?.name) {
@@ -91,6 +101,7 @@ module.exports = {
     ),
 
     productionGroupDetail: combineResolvers(
+      isAuthenticated,
       // hasPermission('productionGroup.read'),
       async (_, { id }) => {
         try {
@@ -113,6 +124,7 @@ module.exports = {
 
   Mutation: {
     productionGroupCreate: combineResolvers(
+      isAuthenticated,
       // hasPermission('productionGroup.create'),
       async (_, { input }) => {
         validateInput(validationSchemas.productionGroupCreate, input);
@@ -122,13 +134,13 @@ module.exports = {
         try {
           const existingProductionGroup = await ProductionGroup.findOne({
             where: {
-              name: input.name,
+              [Sequelize.Op.or]: [{ code: input.code }, { name: input.name }],
             },
           });
 
           if (existingProductionGroup) {
             throw new ApolloError(
-              'A production group with the same name already exists',
+              'A production group with the same code or name already exists',
               apolloErrorCodes.BAD_DATA_VALIDATION
             );
           }
@@ -147,6 +159,7 @@ module.exports = {
     ),
 
     productionGroupUpdate: combineResolvers(
+      isAuthenticated,
       // hasPermission('productionGroup.update'),
       async (_, { id, input }) => {
         validateInput(validationSchemas.productionGroupUpdate, {
@@ -165,17 +178,20 @@ module.exports = {
             );
           }
 
-          if (input.name && input.name !== productionGroup.name) {
+          if (
+            (input.code && input.code !== productionGroup.code) ||
+            (input.name && input.name !== productionGroup.name)
+          ) {
             const existingProductionGroup = await ProductionGroup.findOne({
               where: {
-                name: input.name,
+                [Sequelize.Op.or]: [{ code: input.code }, { name: input.name }],
                 id: { [Sequelize.Op.ne]: id },
               },
             });
 
             if (existingProductionGroup) {
               throw new ApolloError(
-                'A production group with the same name already exists',
+                'A production group with the same code or name already exists',
                 apolloErrorCodes.BAD_DATA_VALIDATION
               );
             }
@@ -193,6 +209,7 @@ module.exports = {
     ),
 
     productionGroupDelete: combineResolvers(
+      isAuthenticated,
       // hasPermission('productionGroup.delete'),
       async (_, { id }) => {
         validateInput(validationSchemas.productionGroupDelete, { id });
@@ -221,4 +238,3 @@ module.exports = {
     ),
   },
 };
-

@@ -8,13 +8,16 @@ const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const PackingShift = require('../../models/packingShift');
 const hasPermission = require('../../middlewares/hasPermission');
+const isAuthenticated = require('../../middlewares/isAuthenticated');
 
 const validationSchemas = {
   packingShiftCreate: Joi.object({
+    code: Joi.string().required(),
     name: Joi.string().required(),
   }),
   packingShiftUpdate: Joi.object({
     id: Joi.number().integer().required(),
+    code: Joi.string().required(),
     name: Joi.string().required(),
   }),
   packingShiftDelete: Joi.object({
@@ -34,6 +37,8 @@ const validateInput = (schema, data) => {
 module.exports = {
   Query: {
     packingShiftList: combineResolvers(
+
+      isAuthenticated,
       // hasPermission('packingShift.read'),
       pageMinCheckAndPageSizeMax,
       async (
@@ -52,8 +57,14 @@ module.exports = {
           if (search) {
             whereClause = definedSearch({
               query: search,
-              inColumns: ['name'],
+              inColumns: ['code', 'name'],
             });
+          }
+
+          if (filter?.code) {
+            whereClause.code = {
+              [Sequelize.Op.like]: `%${filter.code}%`,
+            };
           }
 
           if (filter?.name) {
@@ -91,6 +102,9 @@ module.exports = {
     ),
 
     packingShiftDetail: combineResolvers(
+
+
+      isAuthenticated,
       // hasPermission('packingShift.read'),
       async (_, { id }) => {
         try {
@@ -113,6 +127,8 @@ module.exports = {
 
   Mutation: {
     packingShiftCreate: combineResolvers(
+
+      isAuthenticated,
       // hasPermission('packingShift.create'),
       async (_, { input }) => {
         validateInput(validationSchemas.packingShiftCreate, input);
@@ -122,13 +138,13 @@ module.exports = {
         try {
           const existingPackingShift = await PackingShift.findOne({
             where: {
-              name: input.name,
+              [Sequelize.Op.or]: [{ code: input.code }, { name: input.name }],
             },
           });
 
           if (existingPackingShift) {
             throw new ApolloError(
-              'A packing shift with the same name already exists',
+              'A packing shift with the same code or name already exists',
               apolloErrorCodes.BAD_DATA_VALIDATION
             );
           }
@@ -147,6 +163,9 @@ module.exports = {
     ),
 
     packingShiftUpdate: combineResolvers(
+
+
+      isAuthenticated,
       // hasPermission('packingShift.update'),
       async (_, { id, input }) => {
         validateInput(validationSchemas.packingShiftUpdate, { id, ...input });
@@ -162,17 +181,20 @@ module.exports = {
             );
           }
 
-          if (input.name && input.name !== packingShift.name) {
+          if (
+            (input.code && input.code !== packingShift.code) ||
+            (input.name && input.name !== packingShift.name)
+          ) {
             const existingPackingShift = await PackingShift.findOne({
               where: {
-                name: input.name,
+                [Sequelize.Op.or]: [{ code: input.code }, { name: input.name }],
                 id: { [Sequelize.Op.ne]: id },
               },
             });
 
             if (existingPackingShift) {
               throw new ApolloError(
-                'A packing shift with the same name already exists',
+                'A packing shift with the same code or name already exists',
                 apolloErrorCodes.BAD_DATA_VALIDATION
               );
             }
@@ -190,6 +212,9 @@ module.exports = {
     ),
 
     packingShiftDelete: combineResolvers(
+
+
+      isAuthenticated,
       // hasPermission('packingShift.delete'),
       async (_, { id }) => {
         validateInput(validationSchemas.packingShiftDelete, { id });
@@ -218,4 +243,3 @@ module.exports = {
     ),
   },
 };
-

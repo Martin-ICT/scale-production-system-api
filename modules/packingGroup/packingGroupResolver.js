@@ -8,13 +8,16 @@ const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const PackingGroup = require('../../models/packingGroup');
 const hasPermission = require('../../middlewares/hasPermission');
+const isAuthenticated = require('../../middlewares/isAuthenticated');
 
 const validationSchemas = {
   packingGroupCreate: Joi.object({
+    code: Joi.string().required(),
     name: Joi.string().required(),
   }),
   packingGroupUpdate: Joi.object({
     id: Joi.number().integer().required(),
+    code: Joi.string().required(),
     name: Joi.string().required(),
   }),
   packingGroupDelete: Joi.object({
@@ -34,6 +37,8 @@ const validateInput = (schema, data) => {
 module.exports = {
   Query: {
     packingGroupList: combineResolvers(
+
+      isAuthenticated,
       // hasPermission('packingGroup.read'),
       pageMinCheckAndPageSizeMax,
       async (
@@ -52,8 +57,14 @@ module.exports = {
           if (search) {
             whereClause = definedSearch({
               query: search,
-              inColumns: ['name'],
+              inColumns: ['code', 'name'],
             });
+          }
+
+          if (filter?.code) {
+            whereClause.code = {
+              [Sequelize.Op.like]: `%${filter.code}%`,
+            };
           }
 
           if (filter?.name) {
@@ -91,6 +102,9 @@ module.exports = {
     ),
 
     packingGroupDetail: combineResolvers(
+
+
+      isAuthenticated,
       // hasPermission('packingGroup.read'),
       async (_, { id }) => {
         try {
@@ -113,6 +127,8 @@ module.exports = {
 
   Mutation: {
     packingGroupCreate: combineResolvers(
+
+      isAuthenticated,
       // hasPermission('packingGroup.create'),
       async (_, { input }) => {
         validateInput(validationSchemas.packingGroupCreate, input);
@@ -122,13 +138,13 @@ module.exports = {
         try {
           const existingPackingGroup = await PackingGroup.findOne({
             where: {
-              name: input.name,
+              [Sequelize.Op.or]: [{ code: input.code }, { name: input.name }],
             },
           });
 
           if (existingPackingGroup) {
             throw new ApolloError(
-              'A packing group with the same name already exists',
+              'A packing group with the same code or name already exists',
               apolloErrorCodes.BAD_DATA_VALIDATION
             );
           }
@@ -147,6 +163,9 @@ module.exports = {
     ),
 
     packingGroupUpdate: combineResolvers(
+
+
+      isAuthenticated,
       // hasPermission('packingGroup.update'),
       async (_, { id, input }) => {
         validateInput(validationSchemas.packingGroupUpdate, { id, ...input });
@@ -162,17 +181,20 @@ module.exports = {
             );
           }
 
-          if (input.name && input.name !== packingGroup.name) {
+          if (
+            (input.code && input.code !== packingGroup.code) ||
+            (input.name && input.name !== packingGroup.name)
+          ) {
             const existingPackingGroup = await PackingGroup.findOne({
               where: {
-                name: input.name,
+                [Sequelize.Op.or]: [{ code: input.code }, { name: input.name }],
                 id: { [Sequelize.Op.ne]: id },
               },
             });
 
             if (existingPackingGroup) {
               throw new ApolloError(
-                'A packing group with the same name already exists',
+                'A packing group with the same code or name already exists',
                 apolloErrorCodes.BAD_DATA_VALIDATION
               );
             }
@@ -190,6 +212,9 @@ module.exports = {
     ),
 
     packingGroupDelete: combineResolvers(
+
+
+      isAuthenticated,
       // hasPermission('packingGroup.delete'),
       async (_, { id }) => {
         validateInput(validationSchemas.packingGroupDelete, { id });

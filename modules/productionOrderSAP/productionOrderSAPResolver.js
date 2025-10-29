@@ -8,6 +8,7 @@ const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const ProductionOrderSAP = require('../../models/productionOrderSAP');
 const hasPermission = require('../../middlewares/hasPermission');
+const isAuthenticated = require('../../middlewares/isAuthenticated');
 
 const validationSchemas = {
   productionOrderSAPCreate: Joi.object({
@@ -16,6 +17,10 @@ const validationSchemas = {
     orderTypeCode: Joi.number().integer().required(),
     materialCode: Joi.string().required(),
     targetWeight: Joi.number().integer().required().min(1),
+  }),
+  productionOrderSAPUpdateStatus: Joi.object({
+    id: Joi.number().integer().required(),
+    status: Joi.number().integer().required().min(0),
   }),
 };
 
@@ -31,6 +36,8 @@ const validateInput = (schema, data) => {
 module.exports = {
   Query: {
     productionOrderSAPList: combineResolvers(
+
+      isAuthenticated,
       // hasPermission('productionOrderSAP.read'),
       pageMinCheckAndPageSizeMax,
       async (
@@ -65,6 +72,10 @@ module.exports = {
             whereClause.materialCode = filter.materialCode;
           }
 
+          if (filter?.status !== undefined) {
+            whereClause.status = filter.status;
+          }
+
           const countResult = await ProductionOrderSAP.count({
             where: whereClause,
             distinct: true,
@@ -94,6 +105,9 @@ module.exports = {
     ),
 
     productionOrderSAPDetail: combineResolvers(
+
+
+      isAuthenticated,
       // hasPermission('productionOrderSAP.read'),
       async (_, { id }) => {
         try {
@@ -116,6 +130,8 @@ module.exports = {
 
   Mutation: {
     productionOrderSAPCreate: combineResolvers(
+
+      isAuthenticated,
       // hasPermission('productionOrderSAP.create'),
       async (_, { input }, { user }) => {
         validateInput(validationSchemas.productionOrderSAPCreate, input);
@@ -141,6 +157,39 @@ module.exports = {
           });
           await transaction.commit();
           return newProductionOrderSAP;
+        } catch (err) {
+          await transaction.rollback();
+          throw err;
+        }
+      }
+    ),
+
+    productionOrderSAPUpdateStatus: combineResolvers(
+
+
+      isAuthenticated,
+      // hasPermission('productionOrderSAP.update'),
+      async (_, { id, status }) => {
+        validateInput(validationSchemas.productionOrderSAPUpdateStatus, {
+          id,
+          status,
+        });
+
+        const transaction = await ProductionOrderSAP.sequelize.transaction();
+
+        try {
+          const productionOrderSAP = await ProductionOrderSAP.findByPk(id);
+          if (!productionOrderSAP) {
+            throw new ApolloError(
+              'Production Order SAP not found',
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          await productionOrderSAP.update({ status }, { transaction });
+
+          await transaction.commit();
+          return productionOrderSAP;
         } catch (err) {
           await transaction.rollback();
           throw err;

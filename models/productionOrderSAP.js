@@ -15,6 +15,7 @@ const ProductionOrderSAP = sequelize.define(
       field: 'production_order_number',
       type: DataTypes.STRING,
       allowNull: false,
+      unique: true,
     },
     plantCode: {
       field: 'plant_code',
@@ -36,6 +37,18 @@ const ProductionOrderSAP = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    uom: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    suitability: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    status: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
     productionDate: {
       field: 'production_date',
       type: DataTypes.DATE,
@@ -43,6 +56,12 @@ const ProductionOrderSAP = sequelize.define(
     },
     createdAt: {
       field: 'created_at',
+      type: DataTypes.DATE,
+      defaultValue: Sequelize.NOW,
+      allowNull: false,
+    },
+    updatedAt: {
+      field: 'updated_at',
       type: DataTypes.DATE,
       defaultValue: Sequelize.NOW,
       allowNull: false,

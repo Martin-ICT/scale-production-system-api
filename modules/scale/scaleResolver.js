@@ -8,6 +8,7 @@ const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const Scale = require('../../models/scale');
 const hasPermission = require('../../middlewares/hasPermission');
+const isAuthenticated = require('../../middlewares/isAuthenticated');
 
 // Mapping GraphQL ENUM <-> Database values
 const CAPACITY_MAP = {
@@ -34,6 +35,15 @@ const UOM_MAP = {
   g: 'G',
 };
 
+const STATUS_MAP = {
+  // GraphQL -> Database
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  // Database -> GraphQL (string keys match DB ENUM values)
+  active: 'ACTIVE',
+  inactive: 'INACTIVE',
+};
+
 const validationSchemas = {
   scaleCreate: Joi.object({
     name: Joi.string().required(),
@@ -46,6 +56,7 @@ const validationSchemas = {
       .valid('_3KG', '_6KG', '_9KG', '_12KG', '_15KG')
       .required(),
     lastCalibrate: Joi.date().optional(),
+    status: Joi.string().valid('ACTIVE', 'INACTIVE').optional(),
   }),
   scaleUpdate: Joi.object({
     id: Joi.number().integer().required(),
@@ -57,6 +68,7 @@ const validationSchemas = {
     uom: Joi.string().valid('KG', 'G'),
     capacity: Joi.string().valid('_3KG', '_6KG', '_9KG', '_12KG', '_15KG'),
     lastCalibrate: Joi.date(),
+    status: Joi.string().valid('ACTIVE', 'INACTIVE'),
   }),
   scaleDelete: Joi.object({
     id: Joi.number().integer().required(),
@@ -75,6 +87,8 @@ const validateInput = (schema, data) => {
 module.exports = {
   Query: {
     scaleCount: combineResolvers(
+
+      isAuthenticated,
       // hasPermission('scale.read'),
       async (_, { filter }) => {
         try {
@@ -86,6 +100,10 @@ module.exports = {
 
           if (filter?.capacity) {
             whereClause.capacity = CAPACITY_MAP[filter.capacity];
+          }
+
+          if (filter?.status) {
+            whereClause.status = STATUS_MAP[filter.status];
           }
 
           const count = await Scale.count({
@@ -100,6 +118,9 @@ module.exports = {
     ),
 
     scaleList: combineResolvers(
+
+
+      isAuthenticated,
       // hasPermission('scale.read'),
       pageMinCheckAndPageSizeMax,
       async (
@@ -131,6 +152,10 @@ module.exports = {
             whereClause.capacity = CAPACITY_MAP[filter.capacity];
           }
 
+          if (filter?.status) {
+            whereClause.status = STATUS_MAP[filter.status];
+          }
+
           const countResult = await Scale.count({
             where: whereClause,
             distinct: true,
@@ -160,6 +185,9 @@ module.exports = {
     ),
 
     scaleDetail: combineResolvers(
+
+
+      isAuthenticated,
       // hasPermission('scale.read'),
       async (_, { id }) => {
         try {
@@ -188,10 +216,15 @@ module.exports = {
     uom: (scale) => {
       return UOM_MAP[scale.uom] || scale.uom;
     },
+    status: (scale) => {
+      return STATUS_MAP[scale.status] || scale.status;
+    },
   },
 
   Mutation: {
     scaleCreate: combineResolvers(
+
+      isAuthenticated,
       // hasPermission('scale.create'),
       async (_, { input }) => {
         validateInput(validationSchemas.scaleCreate, input);
@@ -202,6 +235,9 @@ module.exports = {
         }
         if (input.uom) {
           input.uom = UOM_MAP[input.uom];
+        }
+        if (input.status) {
+          input.status = STATUS_MAP[input.status];
         }
 
         const transaction = await Scale.sequelize.transaction();
@@ -227,6 +263,7 @@ module.exports = {
           const result = newScale.toJSON();
           result.capacity = CAPACITY_MAP[result.capacity] || result.capacity;
           result.uom = UOM_MAP[result.uom] || result.uom;
+          result.status = STATUS_MAP[result.status] || result.status;
 
           await transaction.commit();
           return result; // ✅ Return converted plain object
@@ -238,6 +275,9 @@ module.exports = {
     ),
 
     scaleUpdate: combineResolvers(
+
+
+      isAuthenticated,
       // hasPermission('scale.update'),
       async (_, { id, input }) => {
         validateInput(validationSchemas.scaleUpdate, { id, ...input });
@@ -248,6 +288,9 @@ module.exports = {
         }
         if (input.uom) {
           input.uom = UOM_MAP[input.uom];
+        }
+        if (input.status) {
+          input.status = STATUS_MAP[input.status];
         }
 
         const transaction = await Scale.sequelize.transaction();
@@ -287,6 +330,7 @@ module.exports = {
           const result = scale.toJSON();
           result.capacity = CAPACITY_MAP[result.capacity] || result.capacity;
           result.uom = UOM_MAP[result.uom] || result.uom;
+          result.status = STATUS_MAP[result.status] || result.status;
 
           await transaction.commit();
           return result;
@@ -298,6 +342,9 @@ module.exports = {
     ),
 
     scaleDelete: combineResolvers(
+
+
+      isAuthenticated,
       // hasPermission('scale.delete'),
       async (_, { id }) => {
         validateInput(validationSchemas.scaleDelete, { id });

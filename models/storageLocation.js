@@ -12,16 +12,29 @@ const StorageLocation = sequelize.define(
       autoIncrement: true,
       allowNull: false,
     },
-    name: {
+    code: {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
   },
   {
     freezeTableName: true,
     tableName: 'storage_location',
+    timestamps: false,
   }
 );
+
+StorageLocation.associate = (models) => {
+  StorageLocation.belongsToMany(models.OrderType, {
+    through: models.OrderTypeStorageLocation,
+    foreignKey: 'storageLocationId',
+    as: 'orderTypes',
+  });
+};
 
 module.exports = StorageLocation;

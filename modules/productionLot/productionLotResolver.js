@@ -8,14 +8,15 @@ const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const ProductionLot = require('../../models/productionLot');
 const hasPermission = require('../../middlewares/hasPermission');
+const isAuthenticated = require('../../middlewares/isAuthenticated');
 
 const validationSchemas = {
   productionLotCreate: Joi.object({
-    name: Joi.string().required(),
+    code: Joi.string().required(),
   }),
   productionLotUpdate: Joi.object({
     id: Joi.number().integer().required(),
-    name: Joi.string().required(),
+    code: Joi.string().required(),
   }),
   productionLotDelete: Joi.object({
     id: Joi.number().integer().required(),
@@ -52,13 +53,13 @@ module.exports = {
           if (search) {
             whereClause = definedSearch({
               query: search,
-              inColumns: ['name'],
+              inColumns: ['code'],
             });
           }
 
-          if (filter?.name) {
-            whereClause.name = {
-              [Sequelize.Op.like]: `%${filter.name}%`,
+          if (filter?.code) {
+            whereClause.code = {
+              [Sequelize.Op.like]: `%${filter.code}%`,
             };
           }
 
@@ -122,13 +123,13 @@ module.exports = {
         try {
           const existingProductionLot = await ProductionLot.findOne({
             where: {
-              name: input.name,
+              code: input.code,
             },
           });
 
           if (existingProductionLot) {
             throw new ApolloError(
-              'A production lot with the same name already exists',
+              'A production lot with the same code already exists',
               apolloErrorCodes.BAD_DATA_VALIDATION
             );
           }
@@ -162,17 +163,17 @@ module.exports = {
             );
           }
 
-          if (input.name && input.name !== productionLot.name) {
+          if (input.code && input.code !== productionLot.code) {
             const existingProductionLot = await ProductionLot.findOne({
               where: {
-                name: input.name,
+                code: input.code,
                 id: { [Sequelize.Op.ne]: id },
               },
             });
 
             if (existingProductionLot) {
               throw new ApolloError(
-                'A production lot with the same name already exists',
+                'A production lot with the same code already exists',
                 apolloErrorCodes.BAD_DATA_VALIDATION
               );
             }
@@ -218,4 +219,3 @@ module.exports = {
     ),
   },
 };
-

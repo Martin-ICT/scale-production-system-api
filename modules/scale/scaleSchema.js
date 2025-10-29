@@ -14,6 +14,11 @@ module.exports = gql`
     G
   }
 
+  enum ScaleStatus {
+    ACTIVE
+    INACTIVE
+  }
+
   extend type Query {
     scaleCount(filter: ScaleFilter): ScaleCount
     scaleList(
@@ -41,6 +46,7 @@ module.exports = gql`
     uom: ScaleUOM!
     capacity: ScaleCapacity!
     lastCalibrate: DateTime
+    status: ScaleStatus
   }
 
   input ScaleInputUpdate {
@@ -52,6 +58,7 @@ module.exports = gql`
     uom: ScaleUOM
     capacity: ScaleCapacity
     lastCalibrate: DateTime
+    status: ScaleStatus
   }
 
   type ScaleCount {
@@ -68,6 +75,7 @@ module.exports = gql`
     capacity: ScaleCapacity!
     uom: ScaleUOM!
     lastCalibrate: DateTime
+    status: ScaleStatus!
     createdAt: DateTime
     updatedAt: DateTime
     deletedAt: DateTime
@@ -82,6 +90,7 @@ module.exports = gql`
     plantCode: String
     capacity: ScaleCapacity
     uom: ScaleUOM
+    status: ScaleStatus
     createdDate: DateFilter
   }
 `;

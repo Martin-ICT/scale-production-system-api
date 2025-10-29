@@ -16,6 +16,7 @@ module.exports = gql`
     productionOrderSAPCreate(
       input: ProductionOrderSAPInputCreate!
     ): ProductionOrderSAP
+    productionOrderSAPUpdateStatus(id: ID!, status: Int!): ProductionOrderSAP
   }
 
   input ProductionOrderSAPInputCreate {
@@ -35,6 +36,7 @@ module.exports = gql`
     materialCode: String!
     targetWeight: Int!
     productionDate: DateTime!
+    status: Int!
     createdAt: DateTime!
   }
 
@@ -47,5 +49,6 @@ module.exports = gql`
     plantCode: String
     materialCode: String
     orderTypeCode: Int
+    status: Int
   }
 `;

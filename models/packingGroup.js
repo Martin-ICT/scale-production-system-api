@@ -12,15 +12,20 @@ const PackingGroup = sequelize.define(
       autoIncrement: true,
       allowNull: false,
     },
-    name: {
+    code: {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
   },
   {
     freezeTableName: true,
     tableName: 'packing_group',
+    timestamps: false,
   }
 );
 

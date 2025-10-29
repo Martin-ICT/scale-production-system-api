@@ -2,6 +2,31 @@ const { DataTypes } = require('sequelize');
 const Sequelize = require('sequelize');
 const sequelize = require('../db');
 
+// Helper function to generate device ID
+const generateDeviceId = async (model) => {
+  // Find the highest device ID
+  const lastScale = await model.findOne({
+    where: {
+      deviceId: {
+        [Sequelize.Op.like]: 'SC%',
+      },
+    },
+    order: [['deviceId', 'DESC']],
+  });
+
+  let nextNumber = 1;
+  if (lastScale) {
+    const lastDeviceId = lastScale.deviceId;
+    // Extract number from deviceId (e.g., "SC000001" -> 1)
+    const match = lastDeviceId.match(/SC(\d{6})/);
+    if (match) {
+      nextNumber = parseInt(match[1], 10) + 1;
+    }
+  }
+
+  return `SC${String(nextNumber).padStart(6, '0')}`;
+};
+
 const Scale = sequelize.define(
   'scale',
   {
@@ -50,6 +75,11 @@ const Scale = sequelize.define(
       type: DataTypes.DATE,
       allowNull: true,
     },
+    status: {
+      type: DataTypes.ENUM('active', 'inactive'),
+      allowNull: false,
+      defaultValue: 'active',
+    },
     createdAt: {
       field: 'created_at',
       type: DataTypes.DATE,
@@ -73,6 +103,13 @@ const Scale = sequelize.define(
     paranoid: true,
   }
 );
+
+// Hook to auto-generate device ID before creating
+Scale.beforeCreate(async (instance) => {
+  if (!instance.deviceId) {
+    instance.deviceId = await generateDeviceId(Scale);
+  }
+});
 
 Scale.associate = (models) => {
   Scale.hasMany(models.ScaleAssignment, {

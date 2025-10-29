@@ -287,3 +287,7 @@ Pastikan tabel `scale` memiliki record dengan:
 5. **Additional Commands**: Tambahkan support untuk command SICS lainnya (tare, zero, status)
 
 
+
+
+
+

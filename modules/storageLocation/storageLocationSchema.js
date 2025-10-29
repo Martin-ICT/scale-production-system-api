@@ -22,15 +22,18 @@ module.exports = gql`
   }
 
   input StorageLocationInputCreate {
+    code: String!
     name: String!
   }
 
   input StorageLocationInputUpdate {
+    code: String
     name: String
   }
 
   type StorageLocation {
     id: ID!
+    code: String!
     name: String!
   }
 
@@ -40,7 +43,7 @@ module.exports = gql`
   }
 
   input StorageLocationFilter {
+    code: String
     name: String
   }
 `;
-

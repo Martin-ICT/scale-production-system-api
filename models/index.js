@@ -1,39 +1,38 @@
 const sequelize = require('../db');
-const Plant = require('./plant');
-const Scale = require('./scale');
-const ScaleResults = require('./scaleResults');
-const ScaleAssignment = require('./scaleAssignment');
-const GoodReceive = require('./goodReceive');
-const ProductionOrderSAP = require('./productionOrderSAP');
-const ProductionPlanning = require('./productionPlanning');
-const ProductionPlanningLine = require('./productionPlanningLine');
-
-//GoodReceive
+const OrderType = require('./orderType');
+const OrderTypeStorageLocation = require('./orderTypeStorageLocation');
 const PackingGroup = require('./packingGroup');
 const PackingShift = require('./packingShift');
 const ProductionGroup = require('./productionGroup');
-const ProductionShift = require('./productionShift');
 const ProductionLot = require('./productionLot');
-
-const OrderType = require('./orderType');
+const ProductionOrderDetail = require('./productionOrderDetail');
+const ProductionOrderSAP = require('./productionOrderSAP');
+const ProductionShift = require('./productionShift');
+const Scale = require('./scale');
+const ScaleAssignment = require('./scaleAssignment');
+const ScaleResults = require('./scaleResults');
 const StorageLocation = require('./storageLocation');
+const WeightSummaryBatch = require('./weightSummaryBatch');
+const WeightSummaryBatchItem = require('./weightSummaryBatchItem');
+// const ProductionPlanning = require('./productionPlanning');
+// const ProductionPlanningLine = require('./productionPlanningLine');
 
 const models = {
-  Plant,
+  OrderType,
+  OrderTypeStorageLocation,
+  PackingGroup,
+  PackingShift,
+  ProductionGroup,
+  ProductionLot,
+  ProductionOrderDetail,
+  ProductionOrderSAP,
+  ProductionShift,
   Scale,
   ScaleAssignment,
   ScaleResults,
-  GoodReceive,
-  PackingShift,
-  PackingGroup,
-  ProductionGroup,
-  ProductionShift,
-  ProductionLot,
-  ProductionOrderSAP,
-  ProductionPlanning,
-  ProductionPlanningLine,
-  OrderType,
   StorageLocation,
+  WeightSummaryBatch,
+  WeightSummaryBatchItem,
 };
 
 Object.keys(models).forEach((modelName) => {

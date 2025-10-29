@@ -1,6 +1,7 @@
 const { DataTypes } = require('sequelize');
 const Sequelize = require('sequelize');
 const sequelize = require('../db');
+const dayjs = require('dayjs');
 
 const ProductionPlanning = sequelize.define(
   'production_planning',
@@ -14,11 +15,7 @@ const ProductionPlanning = sequelize.define(
     plantId: {
       field: 'plant_id',
       type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'plant',
-        key: 'id',
-      },
+      allowNull: true,
     },
     planDate: {
       field: 'plan_date',

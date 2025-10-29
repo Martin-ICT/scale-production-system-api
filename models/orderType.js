@@ -1,7 +1,6 @@
 const { DataTypes } = require('sequelize');
 const Sequelize = require('sequelize');
 const sequelize = require('../db');
-const dayjs = require('dayjs');
 
 const OrderType = sequelize.define(
   'order_type',
@@ -12,41 +11,40 @@ const OrderType = sequelize.define(
       autoIncrement: true,
       allowNull: false,
     },
-    name: {
-      type: DataTypes.STRING,
+    code: {
+      type: DataTypes.STRING(2),
       allowNull: false,
       unique: true,
     },
-    createdAt: {
-      field: 'created_at',
-      type: DataTypes.DATE,
-      defaultValue: Sequelize.NOW,
+    name: {
+      type: DataTypes.STRING(20),
       allowNull: false,
-      get() {
-        const rawValue = this.getDataValue('createdAt');
-        return rawValue ? dayjs(rawValue).format('YYYY-MM-DD HH:mm:ss') : null;
-      },
     },
-    updatedAt: {
-      field: 'updated_at',
-      type: DataTypes.DATE,
-      defaultValue: Sequelize.NOW,
+    processType: {
+      field: 'process_type',
+      type: DataTypes.INTEGER,
       allowNull: false,
-      get() {
-        const rawValue = this.getDataValue('updatedAt');
-        return rawValue ? dayjs(rawValue).format('YYYY-MM-DD HH:mm:ss') : null;
-      },
     },
-    deletedAt: {
-      field: 'deleted_at',
-      type: DataTypes.DATE,
+    maxDay: {
+      field: 'max_day',
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
   },
   {
     freezeTableName: true,
     tableName: 'order_type',
+    timestamps: true,
     paranoid: true,
   }
 );
+
+OrderType.associate = (models) => {
+  OrderType.belongsToMany(models.StorageLocation, {
+    through: models.OrderTypeStorageLocation,
+    foreignKey: 'orderTypeId',
+    as: 'storageLocations',
+  });
+};
 
 module.exports = OrderType;

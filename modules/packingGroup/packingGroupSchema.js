@@ -19,10 +19,12 @@ module.exports = gql`
   }
 
   input PackingGroupInputCreate {
+    code: String!
     name: String!
   }
 
   input PackingGroupInputUpdate {
+    code: String
     name: String
   }
 
@@ -32,6 +34,7 @@ module.exports = gql`
 
   type PackingGroup {
     id: ID!
+    code: String!
     name: String!
   }
 
@@ -41,6 +44,7 @@ module.exports = gql`
   }
 
   input PackingGroupFilter {
+    code: String
     name: String
   }
 `;

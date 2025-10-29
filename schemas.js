@@ -1,5 +1,4 @@
 const { gql } = require('apollo-server');
-const plantSchema = require('./modules/plant/plantSchema');
 const scaleSchema = require('./modules/scale/scaleSchema');
 const productionOrderSAPSchema = require('./modules/productionOrderSAP/productionOrderSAPSchema');
 const packingGroupSchema = require('./modules/packingGroup/packingGroupSchema');
@@ -8,6 +7,11 @@ const productionLotSchema = require('./modules/productionLot/productionLotSchema
 const productionGroupSchema = require('./modules/productionGroup/productionGroupSchema');
 const productionShiftSchema = require('./modules/productionShift/productionShiftSchema');
 const storageLocationSchema = require('./modules/storageLocation/storageLocationSchema');
+const orderTypeSchema = require('./modules/orderType/orderTypeSchema');
+const materialSchema = require('./modules/material/materialSchema');
+const materialOrderTypeSchema = require('./modules/materialOrderType/materialOrderTypeSchema');
+const elementValueSchema = require('./modules/elementValue/elementValueSchema');
+const authSchema = require('./modules/auth/authSchema');
 
 //shared
 const dateFilterSchema = require('./modules/shared/schemas/dateFilter');
@@ -25,6 +29,7 @@ module.exports = gql`
   scalar PhoneNumber
   type Query
   type Mutation
+  ${authSchema}
   ${scaleSchema}
   ${productionOrderSAPSchema}
   ${packingGroupSchema}
@@ -33,6 +38,10 @@ module.exports = gql`
   ${productionGroupSchema}
   ${productionShiftSchema}
   ${storageLocationSchema}
+  ${orderTypeSchema}
+  ${materialSchema}
+  ${materialOrderTypeSchema}
+  ${elementValueSchema}
   ${dateFilterSchema}
   ${paginationSchema}
   ${sortSchema}

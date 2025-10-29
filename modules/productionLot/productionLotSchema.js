@@ -22,16 +22,16 @@ module.exports = gql`
   }
 
   input ProductionLotInputCreate {
-    name: String!
+    code: String!
   }
 
   input ProductionLotInputUpdate {
-    name: String
+    code: String
   }
 
   type ProductionLot {
     id: ID!
-    name: String!
+    code: String!
   }
 
   type ProductionLotPagination {
@@ -40,6 +40,6 @@ module.exports = gql`
   }
 
   input ProductionLotFilter {
-    name: String
+    code: String
   }
 `;
