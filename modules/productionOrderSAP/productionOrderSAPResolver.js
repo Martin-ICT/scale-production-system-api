@@ -7,6 +7,8 @@ const pageMinCheckAndPageSizeMax = require('../../middlewares/pageMinCheckAndPag
 const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const ProductionOrderSAP = require('../../models/productionOrderSAP');
+const Material = require('../../models/material');
+const MaterialUom = require('../../models/materialUom');
 const hasPermission = require('../../middlewares/hasPermission');
 const isAuthenticated = require('../../middlewares/isAuthenticated');
 
@@ -36,7 +38,6 @@ const validateInput = (schema, data) => {
 module.exports = {
   Query: {
     productionOrderSAPList: combineResolvers(
-
       isAuthenticated,
       // hasPermission('productionOrderSAP.read'),
       pageMinCheckAndPageSizeMax,
@@ -105,8 +106,6 @@ module.exports = {
     ),
 
     productionOrderSAPDetail: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('productionOrderSAP.read'),
       async (_, { id }) => {
@@ -130,7 +129,6 @@ module.exports = {
 
   Mutation: {
     productionOrderSAPCreate: combineResolvers(
-
       isAuthenticated,
       // hasPermission('productionOrderSAP.create'),
       async (_, { input }, { user }) => {
@@ -138,6 +136,30 @@ module.exports = {
         const transaction = await ProductionOrderSAP.sequelize.transaction();
 
         try {
+          // Fetch material from WMS by material code to derive UOM (and validate existence)
+          const material = await Material.findOne({
+            where: {
+              code: input.materialCode,
+              ad_client_id: 1000009,
+            },
+            include: [
+              {
+                model: MaterialUom,
+                as: 'uom',
+                attributes: ['code'],
+                where: { ad_client_id: 1000009 },
+                required: false,
+              },
+            ],
+          });
+
+          if (!material) {
+            throw new ApolloError(
+              'Material not found in WMS for provided materialCode',
+              apolloErrorCodes.BAD_DATA_VALIDATION
+            );
+          }
+
           const existingProductionOrderSAP = await ProductionOrderSAP.findOne({
             where: {
               productionOrderNumber: input.productionOrderNumber,
@@ -152,9 +174,26 @@ module.exports = {
             );
           }
 
-          const newProductionOrderSAP = await ProductionOrderSAP.create(input, {
-            transaction,
-          });
+          const payload = {
+            productionOrderNumber: input.productionOrderNumber,
+            plantCode: input.plantCode,
+            orderTypeCode: input.orderTypeCode,
+            materialCode: input.materialCode,
+            targetWeight: input.targetWeight,
+            productionDate: input.productionDate,
+            suitability: input.suitability,
+            // optional/derived with safe defaults if not provided
+            uom: input.uom ?? material?.uom?.code ?? 'KG',
+            status: input.status ?? 0,
+          };
+
+          const newProductionOrderSAP = await ProductionOrderSAP.create(
+            payload,
+            {
+              transaction,
+            }
+          );
+
           await transaction.commit();
           return newProductionOrderSAP;
         } catch (err) {
@@ -165,8 +204,6 @@ module.exports = {
     ),
 
     productionOrderSAPUpdateStatus: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('productionOrderSAP.update'),
       async (_, { id, status }) => {
