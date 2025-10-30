@@ -26,6 +26,7 @@ module.exports = gql`
     materialCode: String!
     targetWeight: Int!
     productionDate: DateTime!
+    suitability: Int!
   }
 
   type ProductionOrderSAP {
@@ -36,6 +37,7 @@ module.exports = gql`
     materialCode: String!
     targetWeight: Int!
     productionDate: DateTime!
+    suitability: Int
     status: Int!
     createdAt: DateTime!
   }
