@@ -32,7 +32,7 @@ const server = new ApolloServer({
     // Tangkap SequelizeUniqueConstraintError dari `originalError`
     const original = err.originalError;
 
-    if (original?.name === 'SequelizeUniqueConstraintError') {
+    if (original && original.name === 'SequelizeUniqueConstraintError') {
       const details = original.errors.reduce((acc, e) => {
         acc[e.path] = e.message;
         return acc;
@@ -55,7 +55,7 @@ models.sequelize
   .sync()
   .then(() => {
     console.log('Database connected and models synced!');
-    server.listen(5000, '0.0.0.0').then(({ url }) => {
+    server.listen(4000, '0.0.0.0').then(({ url }) => {
       console.log(`🚀 Server ready at ${url}`);
     });
   })

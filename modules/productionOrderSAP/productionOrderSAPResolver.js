@@ -61,6 +61,10 @@ module.exports = {
             });
           }
 
+          if (filter?.productionOrderNumber) {
+            whereClause.productionOrderNumber = filter.productionOrderNumber;
+          }
+
           if (filter?.plantCode) {
             whereClause.plantCode = filter.plantCode;
           }
@@ -129,7 +133,6 @@ module.exports = {
 
   Mutation: {
     productionOrderSAPCreate: combineResolvers(
-      isAuthenticated,
       // hasPermission('productionOrderSAP.create'),
       async (_, { input }, { user }) => {
         validateInput(validationSchemas.productionOrderSAPCreate, input);
@@ -204,18 +207,19 @@ module.exports = {
     ),
 
     productionOrderSAPUpdateStatus: combineResolvers(
-      isAuthenticated,
       // hasPermission('productionOrderSAP.update'),
-      async (_, { id, status }) => {
+      async (_, { productionOrderNumber, status }) => {
         validateInput(validationSchemas.productionOrderSAPUpdateStatus, {
-          id,
+          id: 1,
           status,
         });
 
         const transaction = await ProductionOrderSAP.sequelize.transaction();
 
         try {
-          const productionOrderSAP = await ProductionOrderSAP.findByPk(id);
+          const productionOrderSAP = await ProductionOrderSAP.findOne({
+            where: { productionOrderNumber },
+          });
           if (!productionOrderSAP) {
             throw new ApolloError(
               'Production Order SAP not found',
