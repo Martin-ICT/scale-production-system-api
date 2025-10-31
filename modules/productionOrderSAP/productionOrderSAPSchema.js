@@ -16,7 +16,10 @@ module.exports = gql`
     productionOrderSAPCreate(
       input: ProductionOrderSAPInputCreate!
     ): ProductionOrderSAP
-    productionOrderSAPUpdateStatus(id: ID!, status: Int!): ProductionOrderSAP
+    productionOrderSAPUpdateStatus(
+      productionOrderNumber: String!
+      status: Int!
+    ): ProductionOrderSAP
   }
 
   input ProductionOrderSAPInputCreate {
@@ -27,6 +30,7 @@ module.exports = gql`
     targetWeight: Int!
     productionDate: DateTime!
     suitability: Int!
+    status: Int
   }
 
   type ProductionOrderSAP {
@@ -48,6 +52,7 @@ module.exports = gql`
   }
 
   input ProductionOrderSAPFilter {
+    productionOrderNumber: String
     plantCode: String
     materialCode: String
     orderTypeCode: String

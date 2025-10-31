@@ -12,7 +12,7 @@ const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
  * @param {string} options.message - Isi notifikasi
  * @param {Object} [options.data] - Optional data payload (misal untuk deep linking, dsb)
  */
-const   sendNotification = async ({
+const sendNotification = async ({
   segments = ['Active Subscriptions'],
   title = 'No Title',
   message = 'No Message',
@@ -41,7 +41,7 @@ const   sendNotification = async ({
   } catch (error) {
     console.error(
       '❌ Gagal mengirim notifikasi:',
-      error.response?.data || error.message
+      (error.response && error.response.data) || error.message
     );
     throw error;
   }
