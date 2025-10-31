@@ -18,8 +18,6 @@ const validationSchemas = {
   productionOrderDetailCreate: Joi.object({
     productionOrderId: Joi.number().integer().required(),
     materialCode: Joi.string().required().min(1).max(255),
-    materialDescription: Joi.string().required().min(1).max(500),
-    materialUom: Joi.string().required().min(1).max(50),
     targetWeight: Joi.number().integer().required().min(1),
     processingType: Joi.number().integer().required(),
     orderTypeId: Joi.number().integer().optional(),
@@ -29,8 +27,6 @@ const validationSchemas = {
   }),
   productionOrderDetailUpdate: Joi.object({
     materialCode: Joi.string().min(1).max(255).optional(),
-    materialDescription: Joi.string().min(1).max(500).optional(),
-    materialUom: Joi.string().min(1).max(50).optional(),
     targetWeight: Joi.number().integer().min(1).optional(),
     processingType: Joi.number().integer().optional(),
     orderTypeId: Joi.number().integer().optional(),
@@ -316,8 +312,8 @@ module.exports = {
           const payload = {
             productionOrderId: input.productionOrderId,
             materialCode: input.materialCode,
-            materialDescription: input.materialDescription,
-            materialUom: input.materialUom ?? material?.uom?.code ?? 'KG',
+            materialDescription: material?.name,
+            materialUom: material?.uom?.code,
             targetWeight: input.targetWeight,
             processingType: input.processingType,
             orderTypeId: orderTypeId,
@@ -388,10 +384,9 @@ module.exports = {
               );
             }
 
-            // Auto-update UOM if materialCode changed and UOM not provided
-            if (!input.materialUom && material?.uom?.code) {
-              input.materialUom = material.uom.code;
-            }
+            // Auto-update description and UOM from material if materialCode changed
+            input.materialDescription = material?.name || input.materialCode;
+            input.materialUom = material?.uom?.code || 'KG';
           }
 
           // Validate orderTypeId if provided

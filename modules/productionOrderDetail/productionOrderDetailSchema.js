@@ -38,8 +38,6 @@ module.exports = gql`
   input ProductionOrderDetailInputCreate {
     productionOrderId: Int!
     materialCode: String!
-    materialDescription: String!
-    materialUom: String!
     targetWeight: Int!
     processingType: Int!
     totalWeighed: Float
@@ -49,8 +47,6 @@ module.exports = gql`
 
   input ProductionOrderDetailInputUpdate {
     materialCode: String
-    materialDescription: String
-    materialUom: String
     targetWeight: Int
     processingType: Int
     totalWeighed: Float
