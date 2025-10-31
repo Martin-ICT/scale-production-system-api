@@ -51,8 +51,10 @@ const server = new ApolloServer({
 });
 
 models.sequelize
-  // .sync({ force: true })
-  .sync()
+  // .sync({ force: true }) // ⚠️ DANGER: Drops all tables and recreates them (DATA LOSS)
+  // .sync({ alter: true }) // ⚠️ ERROR: Doesn't work well with ENUM columns in PostgreSQL
+  .sync() // ✅ Default: Only creates missing tables, doesn't alter existing ones
+  // Note: To change ENUM or column types, use manual SQL migration instead
   .then(() => {
     console.log('Database connected and models synced!');
     server.listen(4000, '0.0.0.0').then(({ url }) => {

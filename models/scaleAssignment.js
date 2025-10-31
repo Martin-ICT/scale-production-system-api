@@ -1,6 +1,7 @@
 const { DataTypes } = require('sequelize');
 const Sequelize = require('sequelize');
 const sequelize = require('../db');
+const dayjs = require('dayjs');
 
 const ScaleAssignment = sequelize.define(
   'scale_assignment',
@@ -34,20 +35,12 @@ const ScaleAssignment = sequelize.define(
       type: DataTypes.DATE,
       defaultValue: Sequelize.NOW,
       allowNull: false,
-      get() {
-        const rawValue = this.getDataValue('createdAt');
-        return rawValue ? dayjs(rawValue).format('YYYY-MM-DD HH:mm:ss') : null;
-      },
     },
     updatedAt: {
       field: 'updated_at',
       type: DataTypes.DATE,
       defaultValue: Sequelize.NOW,
       allowNull: false,
-      get() {
-        const rawValue = this.getDataValue('updatedAt');
-        return rawValue ? dayjs(rawValue).format('YYYY-MM-DD HH:mm:ss') : null;
-      },
     },
     deletedAt: {
       field: 'deleted_at',

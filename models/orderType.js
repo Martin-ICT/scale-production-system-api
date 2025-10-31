@@ -17,7 +17,7 @@ const OrderType = sequelize.define(
       unique: true,
     },
     name: {
-      type: DataTypes.STRING(20),
+      type: DataTypes.STRING(50),
       allowNull: false,
     },
     processType: {
@@ -34,8 +34,9 @@ const OrderType = sequelize.define(
   {
     freezeTableName: true,
     tableName: 'order_type',
-    timestamps: true,
-    paranoid: true,
+    timestamps: false,
+    paranoid: false,
+    underscored: false,
   }
 );
 

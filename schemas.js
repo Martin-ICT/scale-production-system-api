@@ -1,5 +1,6 @@
 const { gql } = require('apollo-server');
 const scaleSchema = require('./modules/scale/scaleSchema');
+const scaleAssignmentSchema = require('./modules/scaleAssignment/scaleAssignmentSchema');
 const productionOrderSAPSchema = require('./modules/productionOrderSAP/productionOrderSAPSchema');
 const productionOrderDetailSchema = require('./modules/productionOrderDetail/productionOrderDetailSchema');
 const packingGroupSchema = require('./modules/packingGroup/packingGroupSchema');
@@ -32,6 +33,7 @@ module.exports = gql`
   type Mutation
   ${authSchema}
   ${scaleSchema}
+  ${scaleAssignmentSchema}
   ${productionOrderSAPSchema}
   ${productionOrderDetailSchema}
   ${packingGroupSchema}

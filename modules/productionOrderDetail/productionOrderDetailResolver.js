@@ -302,6 +302,7 @@ module.exports = {
               where: {
                 code: lastTwoChars,
               },
+              attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
             });
 
             if (orderType) {
