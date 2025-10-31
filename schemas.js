@@ -1,6 +1,7 @@
 const { gql } = require('apollo-server');
 const scaleSchema = require('./modules/scale/scaleSchema');
 const productionOrderSAPSchema = require('./modules/productionOrderSAP/productionOrderSAPSchema');
+const productionOrderDetailSchema = require('./modules/productionOrderDetail/productionOrderDetailSchema');
 const packingGroupSchema = require('./modules/packingGroup/packingGroupSchema');
 const packingShiftSchema = require('./modules/packingShift/packingShiftSchema');
 const productionLotSchema = require('./modules/productionLot/productionLotSchema');
@@ -32,6 +33,7 @@ module.exports = gql`
   ${authSchema}
   ${scaleSchema}
   ${productionOrderSAPSchema}
+  ${productionOrderDetailSchema}
   ${packingGroupSchema}
   ${packingShiftSchema}
   ${productionLotSchema}

@@ -16,7 +16,7 @@ const validationSchemas = {
   productionOrderSAPCreate: Joi.object({
     productionOrderNumber: Joi.string().required().min(1).max(255),
     plantCode: Joi.string().required(),
-    orderTypeCode: Joi.number().integer().required(),
+    orderTypeCode: Joi.string().required().max(4),
     materialCode: Joi.string().required(),
     targetWeight: Joi.number().integer().required().min(1),
   }),

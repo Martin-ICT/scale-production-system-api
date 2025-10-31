@@ -24,7 +24,7 @@ const ProductionOrderSAP = sequelize.define(
     },
     orderTypeCode: {
       field: 'order_type_code',
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING(4),
       allowNull: false,
     },
     materialCode: {

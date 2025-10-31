@@ -45,6 +45,15 @@ const ProductionOrderDetail = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    orderTypeId: {
+      field: 'order_type_id',
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'order_type',
+        key: 'id',
+      },
+    },
     totalWeighed: {
       field: 'total_weighed',
       type: DataTypes.DECIMAL(10, 3),
@@ -100,6 +109,11 @@ ProductionOrderDetail.associate = (models) => {
   ProductionOrderDetail.belongsTo(models.ProductionOrderSAP, {
     foreignKey: 'productionOrderId',
     as: 'productionOrderSAP',
+  });
+
+  ProductionOrderDetail.belongsTo(models.OrderType, {
+    foreignKey: 'orderTypeId',
+    as: 'orderType',
   });
 
   ProductionOrderDetail.hasMany(models.WeightSummaryBatch, {

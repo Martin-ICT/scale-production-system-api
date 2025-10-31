@@ -9,6 +9,7 @@ const {
 const authResolver = require('./modules/auth/authResolver');
 const scaleResolver = require('./modules/scale/scaleResolver');
 const productionOrderSAPResolver = require('./modules/productionOrderSAP/productionOrderSAPResolver');
+const productionOrderDetailResolver = require('./modules/productionOrderDetail/productionOrderDetailResolver');
 const packingGroupResolver = require('./modules/packingGroup/packingGroupResolver');
 const packingShiftResolver = require('./modules/packingShift/packingShiftResolver');
 const productionLotResolver = require('./modules/productionLot/productionLotResolver');
@@ -31,6 +32,7 @@ module.exports = {
     ...authResolver.Query,
     ...scaleResolver.Query,
     ...productionOrderSAPResolver.Query,
+    ...productionOrderDetailResolver.Query,
     ...packingGroupResolver.Query,
     ...packingShiftResolver.Query,
     ...productionLotResolver.Query,
@@ -51,6 +53,7 @@ module.exports = {
     ...authResolver.Mutation,
     ...scaleResolver.Mutation,
     ...productionOrderSAPResolver.Mutation,
+    ...productionOrderDetailResolver.Mutation,
     ...packingGroupResolver.Mutation,
     ...packingShiftResolver.Mutation,
     ...productionLotResolver.Mutation,
