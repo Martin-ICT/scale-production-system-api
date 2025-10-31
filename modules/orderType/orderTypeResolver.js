@@ -96,6 +96,7 @@ module.exports = {
             order: [[sort.columnName, sort.sortOrder]],
             limit: pageSize,
             offset: page * pageSize,
+            attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
           });
 
           return {
@@ -120,7 +121,9 @@ module.exports = {
       // hasPermission('orderType.read'),
       async (_, { id }) => {
         try {
-          const orderType = await OrderType.findByPk(id);
+          const orderType = await OrderType.findByPk(id, {
+            attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
+          });
 
           if (!orderType) {
             throw new ApolloError(
@@ -152,6 +155,7 @@ module.exports = {
             where: {
               [Sequelize.Op.or]: [{ code: input.code }, { name: input.name }],
             },
+            attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
           });
 
           if (existingOrderType) {
@@ -166,6 +170,12 @@ module.exports = {
           });
 
           await transaction.commit();
+          
+          // Reload dengan attributes eksplisit
+          await newOrderType.reload({
+            attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
+          });
+          
           return newOrderType;
         } catch (err) {
           await transaction.rollback();
@@ -188,7 +198,9 @@ module.exports = {
         const transaction = await OrderType.sequelize.transaction();
 
         try {
-          const orderType = await OrderType.findByPk(id);
+          const orderType = await OrderType.findByPk(id, {
+            attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
+          });
           if (!orderType) {
             throw new ApolloError(
               'Order Type not found',
@@ -205,6 +217,7 @@ module.exports = {
                 [Sequelize.Op.or]: [{ code: input.code }, { name: input.name }],
                 id: { [Sequelize.Op.ne]: id },
               },
+              attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
             });
 
             if (existingOrderType) {
@@ -218,6 +231,12 @@ module.exports = {
           await orderType.update(input, { transaction });
 
           await transaction.commit();
+          
+          // Reload dengan attributes eksplisit
+          await orderType.reload({
+            attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
+          });
+          
           return orderType;
         } catch (err) {
           await transaction.rollback();
@@ -237,7 +256,9 @@ module.exports = {
         const transaction = await OrderType.sequelize.transaction();
 
         try {
-          const orderType = await OrderType.findByPk(id);
+          const orderType = await OrderType.findByPk(id, {
+            attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
+          });
           if (!orderType) {
             throw new ApolloError(
               'Order Type not found',

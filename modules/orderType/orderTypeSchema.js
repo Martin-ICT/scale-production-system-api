@@ -38,8 +38,6 @@ module.exports = gql`
     name: String!
     processType: Int!
     maxDay: Int!
-    createdAt: DateTime!
-    updatedAt: DateTime!
   }
 
   type OrderTypePagination {

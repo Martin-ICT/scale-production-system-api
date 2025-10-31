@@ -111,9 +111,14 @@ module.exports = {
                 attributes: [
                   'id',
                   'productionOrderNumber',
+                  'plantCode',
+                  'orderTypeCode',
                   'materialCode',
                   'targetWeight',
+                  'productionDate',
+                  'suitability',
                   'status',
+                  'createdAt',
                 ],
                 required: false,
               },
@@ -121,6 +126,7 @@ module.exports = {
                 model: OrderType,
                 as: 'orderType',
                 required: false,
+                attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
               },
             ],
           });
@@ -153,6 +159,18 @@ module.exports = {
                   model: ProductionOrderSAP,
                   as: 'productionOrderSAP',
                   required: false,
+                  attributes: [
+                    'id',
+                    'productionOrderNumber',
+                    'plantCode',
+                    'orderTypeCode',
+                    'materialCode',
+                    'targetWeight',
+                    'productionDate',
+                    'suitability',
+                    'status',
+                    'createdAt',
+                  ],
                 },
                 {
                   model: OrderType,
@@ -213,9 +231,14 @@ module.exports = {
                 attributes: [
                   'id',
                   'productionOrderNumber',
+                  'plantCode',
+                  'orderTypeCode',
                   'materialCode',
                   'targetWeight',
+                  'productionDate',
+                  'suitability',
                   'status',
+                  'createdAt',
                 ],
                 required: false,
               },
@@ -223,6 +246,7 @@ module.exports = {
                 model: OrderType,
                 as: 'orderType',
                 required: false,
+                attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
               },
             ],
           });
@@ -396,7 +420,9 @@ module.exports = {
               // Allow setting to null
               input.orderTypeId = null;
             } else {
-              const orderType = await OrderType.findByPk(input.orderTypeId);
+              const orderType = await OrderType.findByPk(input.orderTypeId, {
+                attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
+              });
               if (!orderType) {
                 throw new ApolloError(
                   'Order Type not found',
