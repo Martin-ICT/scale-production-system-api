@@ -41,7 +41,6 @@ const validateInput = (schema, data) => {
 module.exports = {
   Query: {
     orderTypeList: combineResolvers(
-
       isAuthenticated,
       // hasPermission('orderType.read'),
       pageMinCheckAndPageSizeMax,
@@ -115,8 +114,6 @@ module.exports = {
     ),
 
     orderTypeDetail: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('orderType.read'),
       async (_, { id }) => {
@@ -142,7 +139,6 @@ module.exports = {
 
   Mutation: {
     orderTypeCreate: combineResolvers(
-
       isAuthenticated,
       // hasPermission('orderType.create'),
       async (_, { input }) => {
@@ -170,12 +166,12 @@ module.exports = {
           });
 
           await transaction.commit();
-          
+
           // Reload dengan attributes eksplisit
           await newOrderType.reload({
             attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
           });
-          
+
           return newOrderType;
         } catch (err) {
           await transaction.rollback();
@@ -185,8 +181,6 @@ module.exports = {
     ),
 
     orderTypeUpdate: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('orderType.update'),
       async (_, { id, input }) => {
@@ -231,12 +225,12 @@ module.exports = {
           await orderType.update(input, { transaction });
 
           await transaction.commit();
-          
+
           // Reload dengan attributes eksplisit
           await orderType.reload({
             attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
           });
-          
+
           return orderType;
         } catch (err) {
           await transaction.rollback();
@@ -246,8 +240,6 @@ module.exports = {
     ),
 
     orderTypeDelete: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('orderType.delete'),
       async (_, { id }) => {
