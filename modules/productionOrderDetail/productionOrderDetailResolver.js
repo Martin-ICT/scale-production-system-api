@@ -14,9 +14,6 @@ const MaterialUom = require('../../models/materialUom');
 const hasPermission = require('../../middlewares/hasPermission');
 const isAuthenticated = require('../../middlewares/isAuthenticated');
 
-// Setup Material associations
-Material.belongsTo(MaterialUom, { foreignKey: 'uomId', as: 'uom' });
-
 const validationSchemas = {
   productionOrderDetailCreate: Joi.object({
     productionOrderId: Joi.number().integer().required(),
