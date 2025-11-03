@@ -83,7 +83,7 @@ module.exports = {
               as: 'uom',
               attributes: ['id', 'code', 'name'],
               where: {
-                ad_client_id: 1000009,
+                clientId: 1000009,
               },
               required: false,
             },
@@ -96,7 +96,7 @@ module.exports = {
               as: 'orderTypes',
               where: {
                 code: filter.orderTypeCode,
-                ad_client_id: 1000009,
+                clientId: 1000009,
               },
               required: true, // Only show materials that have this orderType
             });
@@ -105,36 +105,11 @@ module.exports = {
               model: ElementValue,
               as: 'orderTypes',
               where: {
-                ad_client_id: 1000009,
+                clientId: 1000009,
               },
               required: false, // Show all materials with their orderTypes
             });
           }
-
-          // if (filter?.orderTypeCode) {
-          //   // Add MaterialOrderType include for orderType code filtering
-          //   includeClause.push({
-          //     model: MaterialOrderType,
-          //     as: 'materialOrderTypes',
-          //     attributes: [],
-          //     where: {
-          //       ad_client_id: 1000009,
-          //     },
-          //     include: [
-          //       {
-          //         model: ElementValue,
-          //         as: 'orderType',
-          //         attributes: [],
-          //         where: {
-          //           code: filter.orderTypeCode,
-          //           ad_client_id: 1000009,
-          //         },
-          //         required: true,
-          //       },
-          //     ],
-          //     required: true,
-          //   });
-          // }
 
           const countResult = await Material.count({
             where: whereClause,
@@ -181,7 +156,7 @@ module.exports = {
           const material = await Material.findOne({
             where: {
               id: id,
-              ad_client_id: 1000009, // Always filter by client ID
+              clientId: 1000009, // Always filter by client ID
             },
             attributes: ['id', 'code', 'name', 'uomId'],
             include: [
@@ -190,7 +165,7 @@ module.exports = {
                 as: 'uom',
                 attributes: ['id', 'code', 'name'],
                 where: {
-                  ad_client_id: 1000009,
+                  clientId: 1000009,
                 },
                 required: false,
               },
@@ -217,7 +192,7 @@ module.exports = {
       async (_, { filter }) => {
         try {
           let whereClause = {
-            ad_client_id: 1000009, // Always filter by client ID
+            clientId: 1000009, // Always filter by client ID
           };
 
           if (filter?.code) {
@@ -244,7 +219,7 @@ module.exports = {
               as: 'materialOrderTypes',
               attributes: [],
               where: {
-                ad_client_id: 1000009,
+                clientId: 1000009,
               },
               include: [
                 {
@@ -253,7 +228,7 @@ module.exports = {
                   attributes: [],
                   where: {
                     code: filter.orderTypeCode,
-                    ad_client_id: 1000009,
+                    clientId: 1000009,
                   },
                   required: true,
                 },
@@ -289,15 +264,15 @@ module.exports = {
         const materialOrderTypes = await MaterialOrderType.findAll({
           where: {
             materialId: material.id,
-            ad_client_id: 1000009,
+            clientId: 1000009,
           },
           include: [
             {
               model: ElementValue,
               as: 'orderType',
-              attributes: ['id', 'ad_client_id', 'code', 'name', 'description'],
+              attributes: ['id', 'clientId', 'code', 'name', 'description'],
               where: {
-                ad_client_id: 1000009,
+                clientId: 1000009,
               },
               required: false,
             },

@@ -7,6 +7,7 @@ const pageMinCheckAndPageSizeMax = require('../../middlewares/pageMinCheckAndPag
 const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const ProductionOrderSAP = require('../../models/productionOrderSAP');
+const ProductionOrderDetail = require('../../models/productionOrderDetail');
 const Material = require('../../models/material');
 const MaterialUom = require('../../models/materialUom');
 const hasPermission = require('../../middlewares/hasPermission');
@@ -34,6 +35,12 @@ const validateInput = (schema, data) => {
   });
   if (error) joiErrorCallback(error);
 };
+
+// Define association for ProductionOrderSAP hasMany ProductionOrderDetail
+ProductionOrderSAP.hasMany(ProductionOrderDetail, {
+  foreignKey: 'productionOrderId',
+  as: 'productionOrderDetails',
+});
 
 module.exports = {
   Query: {
@@ -92,10 +99,46 @@ module.exports = {
             order: [[sort.columnName, sort.sortOrder]],
             limit: pageSize,
             offset: page * pageSize,
+            include: [
+              {
+                model: ProductionOrderDetail,
+                as: 'productionOrderDetails',
+                required: false,
+              },
+            ],
+          });
+
+          // Fetch material descriptions from WMS database
+          const uniqueMaterialCodes = [
+            ...new Set(result.map((item) => item.materialCode)),
+          ];
+
+          let materialMap = {};
+          if (uniqueMaterialCodes.length > 0) {
+            const materials = await Material.findAll({
+              where: {
+                code: { [Sequelize.Op.in]: uniqueMaterialCodes },
+                clientId: 1000009,
+              },
+              attributes: ['code', 'name'],
+            });
+
+            materialMap = materials.reduce((acc, material) => {
+              acc[material.code] = material.name;
+              return acc;
+            }, {});
+          }
+
+          // Add materialDescription to each result
+          const resultWithDescription = result.map((item) => {
+            const productionOrderSAP = item.toJSON();
+            productionOrderSAP.materialDescription =
+              materialMap[item.materialCode] || null;
+            return productionOrderSAP;
           });
 
           return {
-            productionOrderSAPs: result,
+            productionOrderSAPs: resultWithDescription,
             meta: {
               totalItems: countResult,
               pageSize,
@@ -114,7 +157,15 @@ module.exports = {
       // hasPermission('productionOrderSAP.read'),
       async (_, { id }) => {
         try {
-          const productionOrderSAP = await ProductionOrderSAP.findByPk(id);
+          const productionOrderSAP = await ProductionOrderSAP.findByPk(id, {
+            include: [
+              {
+                model: ProductionOrderDetail,
+                as: 'productionOrderDetails',
+                required: false,
+              },
+            ],
+          });
 
           if (!productionOrderSAP) {
             throw new ApolloError(
@@ -123,7 +174,25 @@ module.exports = {
             );
           }
 
-          return productionOrderSAP;
+          // Fetch material description from WMS database
+          let materialDescription = null;
+          if (productionOrderSAP.materialCode) {
+            const material = await Material.findOne({
+              where: {
+                code: productionOrderSAP.materialCode,
+                clientId: 1000009,
+              },
+              attributes: ['name'],
+            });
+
+            materialDescription = material?.name || null;
+          }
+
+          // Add materialDescription to result
+          const result = productionOrderSAP.toJSON();
+          result.materialDescription = materialDescription;
+
+          return result;
         } catch (err) {
           throw err;
         }
@@ -143,14 +212,14 @@ module.exports = {
           const material = await Material.findOne({
             where: {
               code: input.materialCode,
-              ad_client_id: 1000009,
+              clientId: 1000009,
             },
             include: [
               {
                 model: MaterialUom,
                 as: 'uom',
                 attributes: ['code'],
-                where: { ad_client_id: 1000009 },
+                where: { clientId: 1000009 },
                 required: false,
               },
             ],
@@ -237,5 +306,32 @@ module.exports = {
         }
       }
     ),
+  },
+
+  // Field resolvers
+  ProductionOrderSAP: {
+    productionOrderDetail: async (productionOrderSAP) => {
+      try {
+        // If already included in query, return it
+        if (productionOrderSAP.productionOrderDetails) {
+          return productionOrderSAP.productionOrderDetails;
+        }
+
+        // Otherwise, fetch from database
+        const productionOrderDetails = await ProductionOrderDetail.findAll({
+          where: {
+            productionOrderId: productionOrderSAP.id,
+          },
+        });
+
+        return productionOrderDetails;
+      } catch (error) {
+        console.error(
+          'Error fetching productionOrderDetail for ProductionOrderSAP:',
+          error
+        );
+        return [];
+      }
+    },
   },
 };

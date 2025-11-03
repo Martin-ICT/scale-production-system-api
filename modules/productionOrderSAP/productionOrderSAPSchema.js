@@ -39,8 +39,10 @@ module.exports = gql`
     plantCode: String!
     orderTypeCode: String!
     materialCode: String!
+    materialDescription: String
     targetWeight: Int!
     productionDate: DateTime!
+    productionOrderDetails: [ProductionOrderDetail]
     suitability: Int
     status: Int!
     createdAt: DateTime!
