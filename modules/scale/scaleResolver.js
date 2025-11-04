@@ -87,7 +87,6 @@ const validateInput = (schema, data) => {
 module.exports = {
   Query: {
     scaleCount: combineResolvers(
-
       isAuthenticated,
       // hasPermission('scale.read'),
       async (_, { filter }) => {
@@ -99,7 +98,8 @@ module.exports = {
           }
 
           if (filter?.capacity) {
-            whereClause.capacity = CAPACITY_MAP[filter.capacity];
+            // Use capacity value directly from database
+            whereClause.capacity = filter.capacity;
           }
 
           if (filter?.status) {
@@ -118,8 +118,6 @@ module.exports = {
     ),
 
     scaleList: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('scale.read'),
       pageMinCheckAndPageSizeMax,
@@ -148,8 +146,8 @@ module.exports = {
           }
 
           if (filter?.capacity) {
-            // Convert GraphQL enum to DB value
-            whereClause.capacity = CAPACITY_MAP[filter.capacity];
+            // Use capacity value directly from database
+            whereClause.capacity = filter.capacity;
           }
 
           if (filter?.status) {
@@ -169,8 +167,26 @@ module.exports = {
             offset: page * pageSize,
           });
 
+          // Convert enum values from database to GraphQL enum format (except capacity)
+          const scales = result.map((scale) => {
+            const scaleData = scale.toJSON();
+            // Convert uom and status from database values to GraphQL enum
+            // Capacity: keep as is from database
+            if (scaleData.uom != null) {
+              scaleData.uom =
+                UOM_MAP[String(scaleData.uom).toLowerCase()] ||
+                scaleData.uom.toUpperCase();
+            }
+            if (scaleData.status != null) {
+              scaleData.status =
+                STATUS_MAP[String(scaleData.status).toLowerCase()] ||
+                scaleData.status.toUpperCase();
+            }
+            return scaleData;
+          });
+
           return {
-            scales: result,
+            scales: scales,
             meta: {
               totalItems: countResult,
               pageSize,
@@ -185,8 +201,6 @@ module.exports = {
     ),
 
     scaleDetail: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('scale.read'),
       async (_, { id }) => {
@@ -200,7 +214,21 @@ module.exports = {
             );
           }
 
-          return scale;
+          // Convert enum values from database to GraphQL enum format (except capacity)
+          const scaleData = scale.toJSON();
+          // Capacity: keep as is from database
+          if (scaleData.uom != null) {
+            scaleData.uom =
+              UOM_MAP[String(scaleData.uom).toLowerCase()] ||
+              scaleData.uom.toUpperCase();
+          }
+          if (scaleData.status != null) {
+            scaleData.status =
+              STATUS_MAP[String(scaleData.status).toLowerCase()] ||
+              scaleData.status.toUpperCase();
+          }
+
+          return scaleData;
         } catch (err) {
           throw err;
         }
@@ -209,30 +237,39 @@ module.exports = {
   },
 
   Scale: {
-    // Convert database value to GraphQL ENUM
-    capacity: (scale) => {
-      return CAPACITY_MAP[scale.capacity] || scale.capacity;
-    },
+    // Convert database value to GraphQL ENUM (except capacity - keep as is)
     uom: (scale) => {
-      return UOM_MAP[scale.uom] || scale.uom;
+      try {
+        const rawValue = scale.get ? scale.get('uom') : scale.uom;
+        const uomValue = String(rawValue || '').toLowerCase();
+        const mappedValue = UOM_MAP[uomValue];
+        return mappedValue || uomValue.toUpperCase();
+      } catch (error) {
+        console.error('Error in uom resolver:', error);
+        return scale.uom;
+      }
     },
     status: (scale) => {
-      return STATUS_MAP[scale.status] || scale.status;
+      try {
+        const rawValue = scale.get ? scale.get('status') : scale.status;
+        const statusValue = String(rawValue || '').toLowerCase();
+        const mappedValue = STATUS_MAP[statusValue];
+        return mappedValue || statusValue.toUpperCase();
+      } catch (error) {
+        console.error('Error in status resolver:', error);
+        return scale.status;
+      }
     },
   },
 
   Mutation: {
     scaleCreate: combineResolvers(
-
       isAuthenticated,
       // hasPermission('scale.create'),
       async (_, { input }) => {
         validateInput(validationSchemas.scaleCreate, input);
 
-        // Convert GraphQL ENUM to database value
-        if (input.capacity) {
-          input.capacity = CAPACITY_MAP[input.capacity];
-        }
+        // Convert GraphQL ENUM to database value (capacity: use directly from database)
         if (input.uom) {
           input.uom = UOM_MAP[input.uom];
         }
@@ -261,7 +298,7 @@ module.exports = {
           // Manual ENUM conversion for GraphQL response
           // (Field resolvers don't work on transaction-bound instances)
           const result = newScale.toJSON();
-          result.capacity = CAPACITY_MAP[result.capacity] || result.capacity;
+          // Capacity: keep as is from database
           result.uom = UOM_MAP[result.uom] || result.uom;
           result.status = STATUS_MAP[result.status] || result.status;
 
@@ -275,17 +312,12 @@ module.exports = {
     ),
 
     scaleUpdate: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('scale.update'),
       async (_, { id, input }) => {
         validateInput(validationSchemas.scaleUpdate, { id, ...input });
 
-        // Convert GraphQL ENUM to database value
-        if (input.capacity) {
-          input.capacity = CAPACITY_MAP[input.capacity];
-        }
+        // Convert GraphQL ENUM to database value (capacity: use directly from database)
         if (input.uom) {
           input.uom = UOM_MAP[input.uom];
         }
@@ -328,7 +360,7 @@ module.exports = {
           // Manual ENUM conversion for GraphQL response
           // (Field resolvers don't work on transaction-bound instances)
           const result = scale.toJSON();
-          result.capacity = CAPACITY_MAP[result.capacity] || result.capacity;
+          // Capacity: keep as is from database
           result.uom = UOM_MAP[result.uom] || result.uom;
           result.status = STATUS_MAP[result.status] || result.status;
 
@@ -342,8 +374,6 @@ module.exports = {
     ),
 
     scaleDelete: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('scale.delete'),
       async (_, { id }) => {

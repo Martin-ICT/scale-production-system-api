@@ -9,8 +9,28 @@ const definedSearch = require('../../helpers/definedSearch');
 const ScaleAssignment = require('../../models/scaleAssignment');
 const Scale = require('../../models/scale');
 const ProductionOrderDetail = require('../../models/productionOrderDetail');
+const ProductionOrderSAP = require('../../models/productionOrderSAP');
 const hasPermission = require('../../middlewares/hasPermission');
 const isAuthenticated = require('../../middlewares/isAuthenticated');
+
+// Mapping GraphQL ENUM <-> Database values (same as scaleResolver)
+const UOM_MAP = {
+  // GraphQL -> Database
+  KG: 'kg',
+  G: 'g',
+  // Database -> GraphQL (string keys match DB ENUM values)
+  kg: 'KG',
+  g: 'G',
+};
+
+const STATUS_MAP = {
+  // GraphQL -> Database
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  // Database -> GraphQL (string keys match DB ENUM values)
+  active: 'ACTIVE',
+  inactive: 'INACTIVE',
+};
 
 const validationSchemas = {
   scaleAssignmentCreate: Joi.object({
@@ -83,14 +103,8 @@ module.exports = {
                 required: false,
                 include: [
                   {
-                    model: require('../../models/productionOrderSAP'),
+                    model: ProductionOrderSAP,
                     as: 'productionOrderSAP',
-                    attributes: [
-                      'id',
-                      'productionOrderNumber',
-                      'materialCode',
-                      'status',
-                    ],
                     required: false,
                   },
                 ],
@@ -98,8 +112,27 @@ module.exports = {
             ],
           });
 
+          // Convert enum values from database to GraphQL enum format for Scale
+          const scaleAssignments = result.map((assignment) => {
+            const assignmentData = assignment.toJSON();
+            if (assignmentData.scale) {
+              if (assignmentData.scale.uom != null) {
+                assignmentData.scale.uom =
+                  UOM_MAP[String(assignmentData.scale.uom).toLowerCase()] ||
+                  assignmentData.scale.uom.toUpperCase();
+              }
+              if (assignmentData.scale.status != null) {
+                assignmentData.scale.status =
+                  STATUS_MAP[
+                    String(assignmentData.scale.status).toLowerCase()
+                  ] || assignmentData.scale.status.toUpperCase();
+              }
+            }
+            return assignmentData;
+          });
+
           return {
-            scaleAssignments: result,
+            scaleAssignments: scaleAssignments,
             meta: {
               totalItems: countResult,
               pageSize,
@@ -131,7 +164,7 @@ module.exports = {
                 required: false,
                 include: [
                   {
-                    model: require('../../models/productionOrderSAP'),
+                    model: ProductionOrderSAP,
                     as: 'productionOrderSAP',
                     required: false,
                   },
@@ -147,7 +180,23 @@ module.exports = {
             );
           }
 
-          return scaleAssignment;
+          // Convert enum values from database to GraphQL enum format for Scale
+          const scaleAssignmentData = scaleAssignment.toJSON();
+          if (scaleAssignmentData.scale) {
+            if (scaleAssignmentData.scale.uom != null) {
+              scaleAssignmentData.scale.uom =
+                UOM_MAP[String(scaleAssignmentData.scale.uom).toLowerCase()] ||
+                scaleAssignmentData.scale.uom.toUpperCase();
+            }
+            if (scaleAssignmentData.scale.status != null) {
+              scaleAssignmentData.scale.status =
+                STATUS_MAP[
+                  String(scaleAssignmentData.scale.status).toLowerCase()
+                ] || scaleAssignmentData.scale.status.toUpperCase();
+            }
+          }
+
+          return scaleAssignmentData;
         } catch (err) {
           throw err;
         }
@@ -195,14 +244,8 @@ module.exports = {
                 required: false,
                 include: [
                   {
-                    model: require('../../models/productionOrderSAP'),
+                    model: ProductionOrderSAP,
                     as: 'productionOrderSAP',
-                    attributes: [
-                      'id',
-                      'productionOrderNumber',
-                      'materialCode',
-                      'status',
-                    ],
                     required: false,
                   },
                 ],
@@ -210,8 +253,27 @@ module.exports = {
             ],
           });
 
+          // Convert enum values from database to GraphQL enum format for Scale
+          const scaleAssignments = result.map((assignment) => {
+            const assignmentData = assignment.toJSON();
+            if (assignmentData.scale) {
+              if (assignmentData.scale.uom != null) {
+                assignmentData.scale.uom =
+                  UOM_MAP[String(assignmentData.scale.uom).toLowerCase()] ||
+                  assignmentData.scale.uom.toUpperCase();
+              }
+              if (assignmentData.scale.status != null) {
+                assignmentData.scale.status =
+                  STATUS_MAP[
+                    String(assignmentData.scale.status).toLowerCase()
+                  ] || assignmentData.scale.status.toUpperCase();
+              }
+            }
+            return assignmentData;
+          });
+
           return {
-            scaleAssignments: result,
+            scaleAssignments: scaleAssignments,
             meta: {
               totalItems: countResult,
               pageSize,
@@ -266,14 +328,8 @@ module.exports = {
                 required: false,
                 include: [
                   {
-                    model: require('../../models/productionOrderSAP'),
+                    model: ProductionOrderSAP,
                     as: 'productionOrderSAP',
-                    attributes: [
-                      'id',
-                      'productionOrderNumber',
-                      'materialCode',
-                      'status',
-                    ],
                     required: false,
                   },
                 ],
@@ -281,8 +337,27 @@ module.exports = {
             ],
           });
 
+          // Convert enum values from database to GraphQL enum format for Scale
+          const scaleAssignments = result.map((assignment) => {
+            const assignmentData = assignment.toJSON();
+            if (assignmentData.scale) {
+              if (assignmentData.scale.uom != null) {
+                assignmentData.scale.uom =
+                  UOM_MAP[String(assignmentData.scale.uom).toLowerCase()] ||
+                  assignmentData.scale.uom.toUpperCase();
+              }
+              if (assignmentData.scale.status != null) {
+                assignmentData.scale.status =
+                  STATUS_MAP[
+                    String(assignmentData.scale.status).toLowerCase()
+                  ] || assignmentData.scale.status.toUpperCase();
+              }
+            }
+            return assignmentData;
+          });
+
           return {
-            scaleAssignments: result,
+            scaleAssignments: scaleAssignments,
             meta: {
               totalItems: countResult,
               pageSize,
@@ -359,7 +434,7 @@ module.exports = {
                 as: 'productionOrderDetail',
                 include: [
                   {
-                    model: require('../../models/productionOrderSAP'),
+                    model: ProductionOrderSAP,
                     as: 'productionOrderSAP',
                   },
                 ],
@@ -367,7 +442,23 @@ module.exports = {
             ],
           });
 
-          return newScaleAssignment;
+          // Convert enum values from database to GraphQL enum format for Scale
+          const scaleAssignmentData = newScaleAssignment.toJSON();
+          if (scaleAssignmentData.scale) {
+            if (scaleAssignmentData.scale.uom != null) {
+              scaleAssignmentData.scale.uom =
+                UOM_MAP[String(scaleAssignmentData.scale.uom).toLowerCase()] ||
+                scaleAssignmentData.scale.uom.toUpperCase();
+            }
+            if (scaleAssignmentData.scale.status != null) {
+              scaleAssignmentData.scale.status =
+                STATUS_MAP[
+                  String(scaleAssignmentData.scale.status).toLowerCase()
+                ] || scaleAssignmentData.scale.status.toUpperCase();
+            }
+          }
+
+          return scaleAssignmentData;
         } catch (err) {
           await transaction.rollback();
           throw err;
@@ -456,7 +547,7 @@ module.exports = {
                 as: 'productionOrderDetail',
                 include: [
                   {
-                    model: require('../../models/productionOrderSAP'),
+                    model: ProductionOrderSAP,
                     as: 'productionOrderSAP',
                   },
                 ],
@@ -464,7 +555,23 @@ module.exports = {
             ],
           });
 
-          return scaleAssignment;
+          // Convert enum values from database to GraphQL enum format for Scale
+          const scaleAssignmentData = scaleAssignment.toJSON();
+          if (scaleAssignmentData.scale) {
+            if (scaleAssignmentData.scale.uom != null) {
+              scaleAssignmentData.scale.uom =
+                UOM_MAP[String(scaleAssignmentData.scale.uom).toLowerCase()] ||
+                scaleAssignmentData.scale.uom.toUpperCase();
+            }
+            if (scaleAssignmentData.scale.status != null) {
+              scaleAssignmentData.scale.status =
+                STATUS_MAP[
+                  String(scaleAssignmentData.scale.status).toLowerCase()
+                ] || scaleAssignmentData.scale.status.toUpperCase();
+            }
+          }
+
+          return scaleAssignmentData;
         } catch (err) {
           await transaction.rollback();
           throw err;

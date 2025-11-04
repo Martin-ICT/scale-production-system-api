@@ -72,7 +72,7 @@ module.exports = gql`
     deviceId: String!
     brand: String!
     plantCode: String
-    capacity: ScaleCapacity!
+    capacity: String!
     uom: ScaleUOM!
     lastCalibrate: DateTime
     status: ScaleStatus!

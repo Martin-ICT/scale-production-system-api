@@ -16,6 +16,12 @@ module.exports = gql`
       pageSize: Int
       sort: SortBy
     ): ProductionOrderDetailPagination!
+    productionOrderDetailListByScaleIP(
+      deviceIP: String!
+      page: Int
+      pageSize: Int
+      sort: SortBy
+    ): ProductionOrderDetailPagination!
   }
 
   extend type Mutation {

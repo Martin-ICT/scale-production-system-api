@@ -11,6 +11,8 @@ const ProductionOrderSAP = require('../../models/productionOrderSAP');
 const OrderType = require('../../models/orderType');
 const Material = require('../../models/material');
 const MaterialUom = require('../../models/materialUom');
+const ScaleAssignment = require('../../models/scaleAssignment');
+const Scale = require('../../models/scale');
 const hasPermission = require('../../middlewares/hasPermission');
 const isAuthenticated = require('../../middlewares/isAuthenticated');
 
@@ -211,6 +213,120 @@ module.exports = {
         try {
           const whereClause = {
             productionOrderId: productionOrderId,
+          };
+
+          const countResult = await ProductionOrderDetail.count({
+            where: whereClause,
+            distinct: true,
+            col: 'id',
+          });
+
+          const result = await ProductionOrderDetail.findAll({
+            where: whereClause,
+            order: [[sort.columnName, sort.sortOrder]],
+            limit: pageSize,
+            offset: page * pageSize,
+            include: [
+              {
+                model: ProductionOrderSAP,
+                as: 'productionOrderSAP',
+                attributes: [
+                  'id',
+                  'productionOrderNumber',
+                  'plantCode',
+                  'orderTypeCode',
+                  'materialCode',
+                  'targetWeight',
+                  'productionDate',
+                  'suitability',
+                  'status',
+                  'createdAt',
+                ],
+                required: false,
+              },
+              {
+                model: OrderType,
+                as: 'orderType',
+                required: false,
+                attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
+              },
+            ],
+          });
+
+          return {
+            productionOrderDetails: result,
+            meta: {
+              totalItems: countResult,
+              pageSize,
+              currentPage: page,
+              totalPages: Math.ceil(countResult / pageSize),
+            },
+          };
+        } catch (err) {
+          throw err;
+        }
+      }
+    ),
+
+    productionOrderDetailListByScaleIP: combineResolvers(
+      isAuthenticated,
+      // hasPermission('productionOrderDetail.read'),
+      pageMinCheckAndPageSizeMax,
+      async (
+        _,
+        {
+          deviceIP,
+          page = 0,
+          pageSize = 10,
+          sort = { columnName: 'createdAt', sortOrder: 'DESC' },
+        }
+      ) => {
+        try {
+          // First, find the Scale by deviceIP
+          const scale = await Scale.findOne({
+            where: {
+              deviceIP: deviceIP,
+            },
+          });
+
+          if (!scale) {
+            return {
+              productionOrderDetails: [],
+              meta: {
+                totalItems: 0,
+                pageSize,
+                currentPage: page,
+                totalPages: 0,
+              },
+            };
+          }
+
+          // Find ScaleAssignments for this scale
+          const scaleAssignments = await ScaleAssignment.findAll({
+            where: {
+              scaleId: scale.id,
+            },
+            attributes: ['productionOrderDetailId'],
+          });
+
+          const productionOrderDetailIds = scaleAssignments.map(
+            (sa) => sa.productionOrderDetailId
+          );
+
+          if (productionOrderDetailIds.length === 0) {
+            return {
+              productionOrderDetails: [],
+              meta: {
+                totalItems: 0,
+                pageSize,
+                currentPage: page,
+                totalPages: 0,
+              },
+            };
+          }
+
+          const whereClause = {
+            id: { [Sequelize.Op.in]: productionOrderDetailIds },
           };
 
           const countResult = await ProductionOrderDetail.count({
