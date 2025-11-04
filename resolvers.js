@@ -9,6 +9,7 @@ const {
 const authResolver = require('./modules/auth/authResolver');
 const scaleResolver = require('./modules/scale/scaleResolver');
 const scaleAssignmentResolver = require('./modules/scaleAssignment/scaleAssignmentResolver');
+const scaleResultsResolver = require('./modules/scaleResults/scaleResultsResolver');
 const productionOrderSAPResolver = require('./modules/productionOrderSAP/productionOrderSAPResolver');
 const productionOrderDetailResolver = require('./modules/productionOrderDetail/productionOrderDetailResolver');
 const packingGroupResolver = require('./modules/packingGroup/packingGroupResolver');
@@ -46,6 +47,7 @@ module.exports = {
     ...elementValueResolver.Query,
     ...scaleResolver.Query,
     ...scaleAssignmentResolver.Query,
+    ...scaleResultsResolver.Query,
   },
   Material: {
     ...materialResolver.Material,
@@ -65,5 +67,6 @@ module.exports = {
     ...orderTypeResolver.Mutation,
     ...scaleResolver.Mutation,
     ...scaleAssignmentResolver.Mutation,
+    ...scaleResultsResolver.Mutation,
   },
 };

@@ -21,7 +21,6 @@ const validationSchemas = {
     productionOrderId: Joi.number().integer().required(),
     materialCode: Joi.string().required().min(1).max(255),
     targetWeight: Joi.number().integer().required().min(1),
-    processingType: Joi.number().integer().required(),
     orderTypeId: Joi.number().integer().optional(),
     totalWeighed: Joi.number().min(0).optional(),
     totalWeighedGoodReceive: Joi.number().min(0).optional(),
@@ -30,7 +29,6 @@ const validationSchemas = {
   productionOrderDetailUpdate: Joi.object({
     materialCode: Joi.string().min(1).max(255).optional(),
     targetWeight: Joi.number().integer().min(1).optional(),
-    processingType: Joi.number().integer().optional(),
     orderTypeId: Joi.number().integer().optional(),
     totalWeighed: Joi.number().min(0).optional(),
     totalWeighedGoodReceive: Joi.number().min(0).optional(),
@@ -431,12 +429,15 @@ module.exports = {
           // Get orderTypeId from orderTypeCode in productionOrderSAP
           // Take only last 2 characters from orderTypeCode
           let orderTypeId = null;
+          let processingType = null;
           if (productionOrderSAP.orderTypeCode) {
             const orderTypeCode = productionOrderSAP.orderTypeCode;
             const lastTwoChars =
               orderTypeCode.length >= 2
                 ? orderTypeCode.slice(-2)
                 : orderTypeCode;
+
+            console.log('GILA', lastTwoChars);
 
             const orderType = await OrderType.findOne({
               where: {
@@ -445,8 +446,11 @@ module.exports = {
               attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
             });
 
+            console.log('GILA123', orderType);
+
             if (orderType) {
               orderTypeId = orderType.id;
+              processingType = orderType.processType;
             }
           }
 
@@ -456,7 +460,7 @@ module.exports = {
             materialDescription: material?.name,
             materialUom: material?.uom?.code,
             targetWeight: input.targetWeight,
-            processingType: input.processingType,
+            processingType: processingType,
             orderTypeId: orderTypeId,
             totalWeighed: input.totalWeighed ?? 0,
             totalWeighedGoodReceive: input.totalWeighedGoodReceive ?? 0,
