@@ -102,6 +102,19 @@ const ScaleResults = sequelize.define(
       type: DataTypes.STRING(4),
       allowNull: true,
     },
+    transactionType: {
+      field: 'transaction_type',
+      type: DataTypes.STRING(2),
+      allowNull: true,
+      comment: 'GI (Good Issue) or GR (Good Receive)',
+    },
+    isProcessed: {
+      field: 'is_processed',
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      comment: 'True jika data sudah diproses ke weight_summary',
+    },
     createdAt: {
       field: 'created_at',
       type: DataTypes.DATE,
@@ -135,7 +148,7 @@ ScaleResults.addHook('beforeCreate', async (scaleResult, options) => {
       // Find the latest record for this scaleId and date
       const [lastRecord] = await sequelize.query(
         `SELECT scale_transaction_id FROM scale_results 
-         WHERE scale_id = ? AND DATE(created_date_time) = CURDATE()
+         WHERE scale_id = ? AND DATE(created_at) = CURRENT_DATE
          ORDER BY id DESC LIMIT 1`,
         {
           type: QueryTypes.SELECT,

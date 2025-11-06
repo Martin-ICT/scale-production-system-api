@@ -7,6 +7,10 @@ const pageMinCheckAndPageSizeMax = require('../../middlewares/pageMinCheckAndPag
 const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const Scale = require('../../models/scale');
+const ScaleAssignment = require('../../models/scaleAssignment');
+const ProductionOrderDetail = require('../../models/productionOrderDetail');
+const ProductionOrderSAP = require('../../models/productionOrderSAP');
+const OrderType = require('../../models/orderType');
 const hasPermission = require('../../middlewares/hasPermission');
 const isAuthenticated = require('../../middlewares/isAuthenticated');
 
@@ -165,6 +169,35 @@ module.exports = {
             order: [[sort.columnName, sort.sortOrder]],
             limit: pageSize,
             offset: page * pageSize,
+            include: [
+              {
+                model: ScaleAssignment,
+                as: 'scaleAssignments',
+                required: false,
+                where: {
+                  deletedAt: null,
+                },
+                include: [
+                  {
+                    model: ProductionOrderDetail,
+                    as: 'productionOrderDetail',
+                    required: false,
+                    include: [
+                      {
+                        model: ProductionOrderSAP,
+                        as: 'productionOrderSAP',
+                        required: false,
+                      },
+                      {
+                        model: OrderType,
+                        as: 'orderType',
+                        required: false,
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
           });
 
           // Convert enum values from database to GraphQL enum format (except capacity)
@@ -182,6 +215,23 @@ module.exports = {
                 STATUS_MAP[String(scaleData.status).toLowerCase()] ||
                 scaleData.status.toUpperCase();
             }
+            // Extract productionOrderDetail from scaleAssignments
+            // Filter out details that have null productionOrderSAP to avoid GraphQL errors
+            if (
+              scaleData.scaleAssignments &&
+              scaleData.scaleAssignments.length > 0
+            ) {
+              scaleData.productionOrderDetail = scaleData.scaleAssignments
+                .map((assignment) => assignment.productionOrderDetail)
+                .filter(
+                  (detail) =>
+                    detail !== null && detail.productionOrderSAP !== null
+                );
+            } else {
+              scaleData.productionOrderDetail = [];
+            }
+            // Remove scaleAssignments from response as we only need productionOrderDetail
+            delete scaleData.scaleAssignments;
             return scaleData;
           });
 
@@ -205,7 +255,37 @@ module.exports = {
       // hasPermission('scale.read'),
       async (_, { id }) => {
         try {
-          const scale = await Scale.findByPk(id);
+          const scale = await Scale.findByPk(id, {
+            include: [
+              {
+                model: ScaleAssignment,
+                as: 'scaleAssignments',
+                required: false,
+                where: {
+                  deletedAt: null,
+                },
+                include: [
+                  {
+                    model: ProductionOrderDetail,
+                    as: 'productionOrderDetail',
+                    required: false,
+                    include: [
+                      {
+                        model: ProductionOrderSAP,
+                        as: 'productionOrderSAP',
+                        required: false,
+                      },
+                      {
+                        model: OrderType,
+                        as: 'orderType',
+                        required: false,
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          });
 
           if (!scale) {
             throw new ApolloError(
@@ -227,6 +307,23 @@ module.exports = {
               STATUS_MAP[String(scaleData.status).toLowerCase()] ||
               scaleData.status.toUpperCase();
           }
+          // Extract productionOrderDetail from scaleAssignments
+          // Filter out details that have null productionOrderSAP to avoid GraphQL errors
+          if (
+            scaleData.scaleAssignments &&
+            scaleData.scaleAssignments.length > 0
+          ) {
+            scaleData.productionOrderDetail = scaleData.scaleAssignments
+              .map((assignment) => assignment.productionOrderDetail)
+              .filter(
+                (detail) =>
+                  detail !== null && detail.productionOrderSAP !== null
+              );
+          } else {
+            scaleData.productionOrderDetail = [];
+          }
+          // Remove scaleAssignments from response as we only need productionOrderDetail
+          delete scaleData.scaleAssignments;
 
           return scaleData;
         } catch (err) {

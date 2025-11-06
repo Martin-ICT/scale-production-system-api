@@ -66,7 +66,7 @@ const Scale = sequelize.define(
       allowNull: false,
     },
     capacity: {
-      type: DataTypes.ENUM('3', '6', '9', '12', '15'),
+      type: DataTypes.STRING,
       allowNull: false,
       comment: 'Scale capacity in kilograms',
     },
