@@ -221,7 +221,7 @@ module.exports = {
               scaleData.scaleAssignments &&
               scaleData.scaleAssignments.length > 0
             ) {
-              scaleData.productionOrderDetail = scaleData.scaleAssignments
+              scaleData.productionOrderDetails = scaleData.scaleAssignments
                 .map((assignment) => assignment.productionOrderDetail)
                 .filter(
                   (detail) =>
@@ -313,7 +313,7 @@ module.exports = {
             scaleData.scaleAssignments &&
             scaleData.scaleAssignments.length > 0
           ) {
-            scaleData.productionOrderDetail = scaleData.scaleAssignments
+            scaleData.productionOrderDetails = scaleData.scaleAssignments
               .map((assignment) => assignment.productionOrderDetail)
               .filter(
                 (detail) =>

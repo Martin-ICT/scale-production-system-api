@@ -8,6 +8,7 @@ const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const ProductionOrderSAP = require('../../models/productionOrderSAP');
 const ProductionOrderDetail = require('../../models/productionOrderDetail');
+const ScaleAssignment = require('../../models/scaleAssignment');
 const Material = require('../../models/material');
 const MaterialUom = require('../../models/materialUom');
 const hasPermission = require('../../middlewares/hasPermission');
@@ -88,24 +89,74 @@ module.exports = {
             whereClause.status = filter.status;
           }
 
-          const countResult = await ProductionOrderSAP.count({
+          // Handle scaleId filter through ScaleAssignment -> ProductionOrderDetail -> ProductionOrderSAP
+          let includeOptions = [
+            {
+              model: ProductionOrderDetail,
+              as: 'productionOrderDetails',
+              required: false,
+            },
+          ];
+
+          if (filter?.scaleId) {
+            // When filtering by scaleId, we need to include ScaleAssignment
+            // and make ProductionOrderDetail required to ensure we only get ProductionOrderSAP
+            // that have ProductionOrderDetails with the specified scaleId
+            includeOptions = [
+              {
+                model: ProductionOrderDetail,
+                as: 'productionOrderDetails',
+                required: true,
+                include: [
+                  {
+                    model: ScaleAssignment,
+                    as: 'scaleAssignments',
+                    required: true,
+                    where: {
+                      scaleId: filter.scaleId,
+                    },
+                  },
+                ],
+              },
+            ];
+          }
+
+          // For count, we need to handle scaleId filter differently
+          let countOptions = {
             where: whereClause,
             distinct: true,
             col: 'id',
-          });
+          };
+
+          if (filter?.scaleId) {
+            countOptions.include = [
+              {
+                model: ProductionOrderDetail,
+                as: 'productionOrderDetails',
+                required: true,
+                include: [
+                  {
+                    model: ScaleAssignment,
+                    as: 'scaleAssignments',
+                    required: true,
+                    where: {
+                      scaleId: filter.scaleId,
+                    },
+                  },
+                ],
+              },
+            ];
+          }
+
+          const countResult = await ProductionOrderSAP.count(countOptions);
 
           const result = await ProductionOrderSAP.findAll({
             where: whereClause,
             order: [[sort.columnName, sort.sortOrder]],
             limit: pageSize,
             offset: page * pageSize,
-            include: [
-              {
-                model: ProductionOrderDetail,
-                as: 'productionOrderDetails',
-                required: false,
-              },
-            ],
+            include: includeOptions,
+            distinct: true,
           });
 
           // Fetch material descriptions from WMS database

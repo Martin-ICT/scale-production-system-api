@@ -59,5 +59,6 @@ module.exports = gql`
     materialCode: String
     orderTypeCode: String
     status: Int
+    scaleId: ID
   }
 `;

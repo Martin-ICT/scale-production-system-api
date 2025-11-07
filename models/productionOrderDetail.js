@@ -120,6 +120,11 @@ ProductionOrderDetail.associate = (models) => {
     foreignKey: 'productionOrderDetailId',
     as: 'weightSummaryBatches',
   });
+
+  ProductionOrderDetail.hasMany(models.ScaleAssignment, {
+    foreignKey: 'productionOrderDetailId',
+    as: 'scaleAssignments',
+  });
 };
 
 module.exports = ProductionOrderDetail;
