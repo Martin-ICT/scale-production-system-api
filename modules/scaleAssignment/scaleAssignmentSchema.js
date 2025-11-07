@@ -25,9 +25,7 @@ module.exports = gql`
   }
 
   extend type Mutation {
-    scaleAssignmentCreate(
-      input: ScaleAssignmentInputCreate!
-    ): ScaleAssignment
+    scaleAssignmentCreate(input: ScaleAssignmentInputCreate!): ScaleAssignment
     scaleAssignmentBatchCreate(
       input: ScaleAssignmentInputBatchCreate!
     ): [ScaleAssignment!]!
@@ -74,4 +72,3 @@ module.exports = gql`
     productionOrderDetailId: Int
   }
 `;
-
