@@ -1,0 +1,17 @@
+{
+  "development": {
+    "username": "itretail",
+    "password": "fiesta123*",
+    "database": "prodsysdev",
+    "host": "10.1.4.61",
+    "dialect": "postgres"
+  },
+
+  "production": {
+    "username": "itretail",
+    "password": "fiesta123*",
+    "database": "prodsysdev",
+    "host": "10.1.4.61",
+    "dialect": "postgres"
+  }
+}
