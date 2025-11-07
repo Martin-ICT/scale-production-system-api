@@ -28,6 +28,9 @@ module.exports = gql`
     scaleAssignmentCreate(
       input: ScaleAssignmentInputCreate!
     ): ScaleAssignment
+    scaleAssignmentBatchCreate(
+      input: ScaleAssignmentInputBatchCreate!
+    ): [ScaleAssignment!]!
     scaleAssignmentUpdate(
       id: ID!
       input: ScaleAssignmentInputUpdate!
@@ -38,6 +41,11 @@ module.exports = gql`
   input ScaleAssignmentInputCreate {
     scaleId: Int!
     productionOrderDetailId: Int!
+  }
+
+  input ScaleAssignmentInputBatchCreate {
+    scaleId: Int!
+    productionOrderDetailIds: [Int!]!
   }
 
   input ScaleAssignmentInputUpdate {

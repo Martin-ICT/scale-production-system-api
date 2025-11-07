@@ -108,12 +108,11 @@ const ScaleResults = sequelize.define(
       allowNull: true,
       comment: 'GI (Good Issue) or GR (Good Receive)',
     },
-    isProcessed: {
-      field: 'is_processed',
+    isSummarized: {
+      field: 'is_summarized',
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,
-      comment: 'True jika data sudah diproses ke weight_summary',
     },
     createdAt: {
       field: 'created_at',

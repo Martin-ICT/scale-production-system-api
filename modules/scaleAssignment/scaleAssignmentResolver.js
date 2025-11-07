@@ -37,6 +37,13 @@ const validationSchemas = {
     scaleId: Joi.number().integer().required(),
     productionOrderDetailId: Joi.number().integer().required(),
   }),
+  scaleAssignmentBatchCreate: Joi.object({
+    scaleId: Joi.number().integer().required(),
+    productionOrderDetailIds: Joi.array()
+      .items(Joi.number().integer().required())
+      .min(1)
+      .required(),
+  }),
   scaleAssignmentUpdate: Joi.object({
     scaleId: Joi.number().integer().optional(),
     productionOrderDetailId: Joi.number().integer().optional(),
@@ -459,6 +466,140 @@ module.exports = {
           }
 
           return scaleAssignmentData;
+        } catch (err) {
+          await transaction.rollback();
+          throw err;
+        }
+      }
+    ),
+
+    scaleAssignmentBatchCreate: combineResolvers(
+      isAuthenticated,
+      // hasPermission('scaleAssignment.create'),
+      async (_, { input }, { user }) => {
+        validateInput(validationSchemas.scaleAssignmentBatchCreate, input);
+        const transaction = await ScaleAssignment.sequelize.transaction();
+
+        try {
+          // Validate Scale exists
+          const scale = await Scale.findByPk(input.scaleId);
+          if (!scale) {
+            throw new ApolloError(
+              'Scale not found',
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          // Remove duplicates from input array
+          const uniqueProductionOrderDetailIds = [
+            ...new Set(input.productionOrderDetailIds),
+          ];
+
+          // Validate all ProductionOrderDetails exist
+          const productionOrderDetails = await ProductionOrderDetail.findAll({
+            where: {
+              id: { [Sequelize.Op.in]: uniqueProductionOrderDetailIds },
+            },
+          });
+
+          if (
+            productionOrderDetails.length !==
+            uniqueProductionOrderDetailIds.length
+          ) {
+            const foundIds = productionOrderDetails.map((pod) => pod.id);
+            const missingIds = uniqueProductionOrderDetailIds.filter(
+              (id) => !foundIds.includes(id)
+            );
+            throw new ApolloError(
+              `Production Order Detail(s) not found: ${missingIds.join(', ')}`,
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          // Check for existing assignments
+          const existingAssignments = await ScaleAssignment.findAll({
+            where: {
+              scaleId: input.scaleId,
+              productionOrderDetailId: {
+                [Sequelize.Op.in]: uniqueProductionOrderDetailIds,
+              },
+            },
+          });
+
+          if (existingAssignments.length > 0) {
+            const existingIds = existingAssignments.map(
+              (ea) => ea.productionOrderDetailId
+            );
+            throw new ApolloError(
+              `Scale assignment already exists for scale ${
+                input.scaleId
+              } and production order detail(s): ${existingIds.join(', ')}`,
+              apolloErrorCodes.BAD_DATA_VALIDATION
+            );
+          }
+
+          // Create all assignments
+          const assignmentsToCreate = uniqueProductionOrderDetailIds.map(
+            (productionOrderDetailId) => ({
+              scaleId: input.scaleId,
+              productionOrderDetailId,
+            })
+          );
+
+          const newScaleAssignments = await ScaleAssignment.bulkCreate(
+            assignmentsToCreate,
+            {
+              transaction,
+              returning: true,
+            }
+          );
+
+          await transaction.commit();
+
+          // Reload all with associations
+          const scaleAssignmentIds = newScaleAssignments.map((sa) => sa.id);
+          const reloadedAssignments = await ScaleAssignment.findAll({
+            where: {
+              id: { [Sequelize.Op.in]: scaleAssignmentIds },
+            },
+            include: [
+              {
+                model: Scale,
+                as: 'scale',
+              },
+              {
+                model: ProductionOrderDetail,
+                as: 'productionOrderDetail',
+                include: [
+                  {
+                    model: ProductionOrderSAP,
+                    as: 'productionOrderSAP',
+                  },
+                ],
+              },
+            ],
+          });
+
+          // Convert enum values from database to GraphQL enum format for Scale
+          const scaleAssignmentsData = reloadedAssignments.map((assignment) => {
+            const assignmentData = assignment.toJSON();
+            if (assignmentData.scale) {
+              if (assignmentData.scale.uom != null) {
+                assignmentData.scale.uom =
+                  UOM_MAP[String(assignmentData.scale.uom).toLowerCase()] ||
+                  assignmentData.scale.uom.toUpperCase();
+              }
+              if (assignmentData.scale.status != null) {
+                assignmentData.scale.status =
+                  STATUS_MAP[
+                    String(assignmentData.scale.status).toLowerCase()
+                  ] || assignmentData.scale.status.toUpperCase();
+              }
+            }
+            return assignmentData;
+          });
+
+          return scaleAssignmentsData;
         } catch (err) {
           await transaction.rollback();
           throw err;
