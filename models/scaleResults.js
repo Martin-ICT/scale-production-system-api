@@ -27,8 +27,8 @@ const ScaleResults = sequelize.define(
       type: DataTypes.STRING(20),
       allowNull: true,
     },
-    plant: {
-      field: 'plant',
+    plantCode: {
+      field: 'plant_code',
       type: DataTypes.STRING(4),
       allowNull: true,
     },

@@ -76,7 +76,7 @@ module.exports = gql`
     uom: ScaleUOM!
     lastCalibrate: DateTime
     status: ScaleStatus!
-    productionOrderDetail: [ProductionOrderDetail]
+    productionOrderDetails: [ProductionOrderDetail]
     createdAt: DateTime
     updatedAt: DateTime
     deletedAt: DateTime

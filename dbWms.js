@@ -3,11 +3,11 @@ const { Sequelize } = require('sequelize');
 // WMS Database configuration (External PostgreSQL)
 const config = {
   dialect: 'postgres',
-  host: process.env.WMS_DB_HOST || '10.1.3.139',
-  port: process.env.WMS_DB_PORT || 5437,
-  database: process.env.WMS_DB_NAME || 'wmsdbdev',
-  username: process.env.WMS_DB_USER || 'adempiere',
-  password: process.env.WMS_DB_PASSWORD || 'WMSDb!23?',
+  host: process.env.WMS_DB_HOST,
+  port: process.env.WMS_DB_PORT,
+  database: process.env.WMS_DB_NAME,
+  username: process.env.WMS_DB_USER,
+  password: process.env.WMS_DB_PASSWORD,
   logging: false, // Set to console.log to see SQL queries
 };
 
@@ -37,7 +37,3 @@ sequelizeWms
   });
 
 module.exports = sequelizeWms;
-
-
-
-

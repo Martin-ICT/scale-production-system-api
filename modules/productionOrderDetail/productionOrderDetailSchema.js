@@ -89,5 +89,6 @@ module.exports = gql`
     materialCode: String
     processingType: Int
     orderTypeId: Int
+    scaleId: ID
   }
 `;
