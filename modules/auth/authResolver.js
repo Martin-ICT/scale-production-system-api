@@ -2,6 +2,7 @@ const { ApolloError, AuthenticationError } = require('apollo-server');
 const { combineResolvers } = require('graphql-resolvers');
 const Joi = require('joi');
 const User = require('../../models/user');
+const Organization = require('../../models/organization');
 const { generateToken, verifyToken } = require('../../helpers/jwtHelper');
 const { joiErrorCallback } = require('../../helpers/errorHelper');
 const apolloErrorCodes = require('../../constants/apolloErrorCodes');
@@ -22,6 +23,34 @@ const validateInput = (schema, data) => {
     allowUnknown: true,
   });
   if (error) joiErrorCallback(error);
+};
+
+// Helper function to fetch and attach organization data to user
+const attachOrganizationToUser = async (user) => {
+  if (!user || !user.organizationId) {
+    return {
+      plantCode: null,
+      plantName: null,
+    };
+  }
+
+  try {
+    const organization = await Organization.findByPk(user.organizationId);
+    if (organization) {
+      return {
+        plantCode: organization.code,
+        plantName: organization.name,
+      };
+    }
+  } catch (err) {
+    // If organization not found, return null values
+    console.error('Error fetching organization:', err);
+  }
+
+  return {
+    plantCode: null,
+    plantName: null,
+  };
 };
 
 module.exports = {
@@ -58,9 +87,15 @@ module.exports = {
           };
         }
 
+        // Fetch organization data and attach to user
+        const organizationData = await attachOrganizationToUser(user);
+        const userResponse = user.toJSON();
+        userResponse.plantCode = organizationData.plantCode;
+        userResponse.plantName = organizationData.plantName;
+
         return {
           valid: true,
-          user,
+          user: userResponse,
           message: 'Token is valid',
         };
       } catch (err) {
@@ -115,9 +150,16 @@ module.exports = {
         //   email: user.email,
         // });
 
+        // Fetch organization data and attach to user
+        const organizationData = await attachOrganizationToUser(user);
+
         // Return user without password
         const userResponse = user.toJSON();
         delete userResponse.password;
+
+        // Add plantCode and plantName to user response
+        userResponse.plantCode = organizationData.plantCode;
+        userResponse.plantName = organizationData.plantName;
 
         return {
           success: true,

@@ -24,6 +24,11 @@ const User = sequelizeWms.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    organizationId: {
+      field: 'ad_org_id',
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
     name: {
       type: DataTypes.STRING,
       allowNull: false,

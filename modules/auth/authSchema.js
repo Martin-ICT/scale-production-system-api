@@ -33,6 +33,8 @@ module.exports = gql`
     clientId: Int!
     name: String!
     email: String
+    plantCode: String
+    plantName: String
     isActive: String!
   }
 `;

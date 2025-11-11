@@ -52,6 +52,9 @@ module.exports = {
   Material: {
     ...materialResolver.Material,
   },
+  ProductionOrderDetail: {
+    ...productionOrderDetailResolver.ProductionOrderDetail,
+  },
   Mutation: {
     // ...plantResolver.Mutation,
     ...authResolver.Mutation,

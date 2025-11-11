@@ -1,21 +1,18 @@
 const { DataTypes } = require('sequelize');
 const sequelizeWms = require('../dbWms');
 
-const MaterialUom = sequelizeWms.define(
-  'c_uom',
+const Organization = sequelizeWms.define(
+  'ad_org',
   {
     id: {
-      field: 'c_uom_id',
+      field: 'ad_org_id',
       type: DataTypes.INTEGER,
       primaryKey: true,
+      autoIncrement: true,
       allowNull: false,
     },
-    clientId: {
-      field: 'ad_client_id',
-      type: DataTypes.INTEGER,
-    },
     code: {
-      field: 'uomsymbol',
+      field: 'value',
       type: DataTypes.STRING,
       allowNull: false,
     },
@@ -23,19 +20,16 @@ const MaterialUom = sequelizeWms.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    description: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
   },
   {
     freezeTableName: true,
-    tableName: 'c_uom',
+    tableName: 'ad_org',
     timestamps: false, // Disable automatic timestamp fields
   }
 );
 
-MaterialUom.associate = (models) => {
-  MaterialUom.hasMany(models.Material, {
-    foreignKey: 'uomId',
-    as: 'materials',
-  });
-};
-
-module.exports = MaterialUom;
+module.exports = Organization;

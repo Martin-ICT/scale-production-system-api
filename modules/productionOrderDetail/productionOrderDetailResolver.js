@@ -16,6 +16,66 @@ const Scale = require('../../models/scale');
 const hasPermission = require('../../middlewares/hasPermission');
 const isAuthenticated = require('../../middlewares/isAuthenticated');
 
+const MATERIAL_CLIENT_ID = 1000009;
+
+const attachMaterialToDetails = async (details) => {
+  if (!details || (Array.isArray(details) && details.length === 0)) {
+    return;
+  }
+
+  const detailArray = Array.isArray(details) ? details : [details];
+
+  const materialCodes = [
+    ...new Set(
+      detailArray
+        .map((item) => item?.materialCode)
+        .filter((code) => typeof code === 'string' && code.trim().length > 0)
+    ),
+  ];
+
+  if (materialCodes.length === 0) {
+    detailArray.forEach((item) => {
+      if (item?.setDataValue) item.setDataValue('material', null);
+    });
+    return;
+  }
+
+  const materials = await Material.findAll({
+    where: {
+      code: { [Sequelize.Op.in]: materialCodes },
+      clientId: MATERIAL_CLIENT_ID,
+    },
+    include: [
+      {
+        model: MaterialUom,
+        as: 'uom',
+        required: false,
+        attributes: ['id', 'clientId', 'code', 'name'],
+      },
+    ],
+  });
+
+  const materialMap = materials.reduce((acc, material) => {
+    acc[material.code] = material.toJSON();
+    return acc;
+  }, {});
+
+  detailArray.forEach((item) => {
+    if (!item || !item.materialCode) {
+      if (item?.setDataValue) item.setDataValue('material', null);
+      return;
+    }
+
+    const material = materialMap[item.materialCode] || null;
+
+    if (item.setDataValue) {
+      item.setDataValue('material', material);
+    } else {
+      item.material = material;
+    }
+  });
+};
+
 const validationSchemas = {
   productionOrderDetailCreate: Joi.object({
     productionOrderId: Joi.number().integer().required(),
@@ -93,10 +153,84 @@ module.exports = {
             whereClause.orderTypeId = filter.orderTypeId;
           }
 
+          const productionOrderSAPInclude = {
+            model: ProductionOrderSAP,
+            as: 'productionOrderSAP',
+            attributes: [
+              'id',
+              'productionOrderNumber',
+              'plantCode',
+              'orderTypeCode',
+              'materialCode',
+              'targetWeight',
+              'productionDate',
+              'suitability',
+              'status',
+              'createdAt',
+            ],
+            required: !!filter?.productionOrderNumber,
+          };
+
+          if (filter?.productionOrderNumber) {
+            productionOrderSAPInclude.where = {
+              productionOrderNumber: filter.productionOrderNumber,
+            };
+          }
+
+          let includeOptions = [
+            productionOrderSAPInclude,
+            {
+              model: OrderType,
+              as: 'orderType',
+              required: false,
+              attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
+            },
+          ];
+
+          if (filter?.scaleId) {
+            includeOptions.push({
+              model: ScaleAssignment,
+              as: 'scaleAssignments',
+              required: true,
+              attributes: [],
+              where: { scaleId: filter.scaleId },
+            });
+          }
+
+          const countInclude = [];
+
+          if (filter?.productionOrderNumber) {
+            countInclude.push({
+              model: ProductionOrderSAP,
+              as: 'productionOrderSAP',
+              required: true,
+              attributes: [],
+              where: { productionOrderNumber: filter.productionOrderNumber },
+            });
+          }
+
+          if (filter?.scaleId) {
+            includeOptions.push({
+              model: ScaleAssignment,
+              as: 'scaleAssignments',
+              required: true,
+              attributes: [],
+              where: { scaleId: filter.scaleId },
+            });
+            countInclude.push({
+              model: ScaleAssignment,
+              as: 'scaleAssignments',
+              required: true,
+              attributes: [],
+              where: { scaleId: filter.scaleId },
+            });
+          }
+
           const countResult = await ProductionOrderDetail.count({
             where: whereClause,
             distinct: true,
             col: 'id',
+            include: countInclude.length > 0 ? countInclude : undefined,
           });
 
           const result = await ProductionOrderDetail.findAll({
@@ -104,32 +238,11 @@ module.exports = {
             order: [[sort.columnName, sort.sortOrder]],
             limit: pageSize,
             offset: page * pageSize,
-            include: [
-              {
-                model: ProductionOrderSAP,
-                as: 'productionOrderSAP',
-                attributes: [
-                  'id',
-                  'productionOrderNumber',
-                  'plantCode',
-                  'orderTypeCode',
-                  'materialCode',
-                  'targetWeight',
-                  'productionDate',
-                  'suitability',
-                  'status',
-                  'createdAt',
-                ],
-                required: false,
-              },
-              {
-                model: OrderType,
-                as: 'orderType',
-                required: false,
-                attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
-              },
-            ],
+            include: includeOptions,
+            distinct: true,
           });
+
+          await attachMaterialToDetails(result);
 
           return {
             productionOrderDetails: result,
@@ -187,6 +300,8 @@ module.exports = {
               apolloErrorCodes.NOT_FOUND
             );
           }
+
+          await attachMaterialToDetails(productionOrderDetail);
 
           return productionOrderDetail;
         } catch (err) {
@@ -250,6 +365,8 @@ module.exports = {
               },
             ],
           });
+
+          await attachMaterialToDetails(result);
 
           return {
             productionOrderDetails: result,
@@ -365,6 +482,8 @@ module.exports = {
             ],
           });
 
+          await attachMaterialToDetails(result);
+
           return {
             productionOrderDetails: result,
             meta: {
@@ -412,7 +531,7 @@ module.exports = {
               {
                 model: MaterialUom,
                 as: 'uom',
-                attributes: ['code'],
+                attributes: ['id', 'clientId', 'code', 'name'],
                 where: { clientId: 1000009 },
                 required: false,
               },
@@ -437,16 +556,12 @@ module.exports = {
                 ? orderTypeCode.slice(-2)
                 : orderTypeCode;
 
-            console.log('GILA', lastTwoChars);
-
             const orderType = await OrderType.findOne({
               where: {
                 code: lastTwoChars,
               },
               attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
             });
-
-            console.log('GILA123', orderType);
 
             if (orderType) {
               orderTypeId = orderType.id;
@@ -660,5 +775,45 @@ module.exports = {
         }
       }
     ),
+  },
+
+  // Field resolvers
+  ProductionOrderDetail: {
+    material: async (productionOrderDetail) => {
+      try {
+        // If material is already attached (from attachMaterialToDetails), return it
+        if (productionOrderDetail.material) {
+          return productionOrderDetail.material;
+        }
+
+        // Otherwise, fetch from database
+        if (!productionOrderDetail.materialCode) {
+          return null;
+        }
+
+        const material = await Material.findOne({
+          where: {
+            code: productionOrderDetail.materialCode,
+            clientId: MATERIAL_CLIENT_ID,
+          },
+          include: [
+            {
+              model: MaterialUom,
+              as: 'uom',
+              required: false,
+              attributes: ['id', 'clientId', 'code', 'name'],
+            },
+          ],
+        });
+
+        return material ? material.toJSON() : null;
+      } catch (error) {
+        console.error(
+          'Error fetching material for ProductionOrderDetail:',
+          error
+        );
+        return null;
+      }
+    },
   },
 };

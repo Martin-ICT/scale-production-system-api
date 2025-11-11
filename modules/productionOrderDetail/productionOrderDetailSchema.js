@@ -77,6 +77,7 @@ module.exports = gql`
     deletedAt: DateTime
     productionOrderSAP: ProductionOrderSAP
     orderType: OrderType
+    material: Material
   }
 
   type ProductionOrderDetailPagination {
@@ -86,6 +87,7 @@ module.exports = gql`
 
   input ProductionOrderDetailFilter {
     productionOrderId: Int
+    productionOrderNumber: String
     materialCode: String
     processingType: Int
     orderTypeId: Int
