@@ -78,6 +78,7 @@ module.exports = gql`
     productionOrderSAP: ProductionOrderSAP
     orderType: OrderType
     material: Material
+    scales: [Scale]
   }
 
   type ProductionOrderDetailPagination {

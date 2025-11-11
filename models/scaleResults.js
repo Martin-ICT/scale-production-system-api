@@ -29,7 +29,7 @@ const ScaleResults = sequelize.define(
     },
     plantCode: {
       field: 'plant_code',
-      type: DataTypes.STRING(4),
+      type: DataTypes.STRING(10),
       allowNull: true,
     },
     materialCode: {
@@ -69,7 +69,7 @@ const ScaleResults = sequelize.define(
     },
     packingGroup: {
       field: 'packing_group',
-      type: DataTypes.STRING(2),
+      type: DataTypes.STRING(10),
       allowNull: true,
     },
     packingShift: {
@@ -79,12 +79,12 @@ const ScaleResults = sequelize.define(
     },
     productionLot: {
       field: 'production_lot',
-      type: DataTypes.STRING(2),
+      type: DataTypes.STRING(10),
       allowNull: true,
     },
     productionLocation: {
       field: 'production_location',
-      type: DataTypes.STRING(2),
+      type: DataTypes.STRING(10),
       allowNull: true,
     },
     userId: {
@@ -99,7 +99,7 @@ const ScaleResults = sequelize.define(
     },
     storageLocation: {
       field: 'storage_location',
-      type: DataTypes.STRING(4),
+      type: DataTypes.STRING(10),
       allowNull: true,
     },
     transactionType: {
@@ -138,11 +138,10 @@ ScaleResults.addHook('beforeCreate', async (scaleResult, options) => {
   // Generate scaleTransactionId if not provided
   if (!scaleResult.scaleTransactionId) {
     try {
-      // Get current date in YYYYMMDD format
-      const currentDate = dayjs().format('YYYYMMDD');
-
-      // Ensure scaleId is 3 digits with zero padding
-      const scaleId = String(scaleResult.scaleId).padStart(3, '0');
+      // Get current date and time
+      const now = dayjs();
+      const currentDate = now.format('YYYYMMDD');
+      const currentTime = now.format('HHmmss');
 
       // Find the latest record for this scaleId and date
       const [lastRecord] = await sequelize.query(
@@ -151,29 +150,30 @@ ScaleResults.addHook('beforeCreate', async (scaleResult, options) => {
          ORDER BY id DESC LIMIT 1`,
         {
           type: QueryTypes.SELECT,
-          replacements: [scaleId],
+          replacements: [scaleResult.scaleId],
         }
       );
 
       let nextIndex = 1;
       if (lastRecord && lastRecord.scale_transaction_id) {
-        // Extract index from last scaleTransactionId (e.g., "SC0001011020251" -> 1)
-        const match = lastRecord.scale_transaction_id.match(/(\d{3})$/);
+        // Extract index from last scaleTransactionId (e.g., "SCALE_20251111_094918_527" -> 527)
+        const match = lastRecord.scale_transaction_id.match(/_(\d{3})$/);
         if (match) {
           nextIndex = parseInt(match[1], 10) + 1;
         }
       }
 
-      // Format as SC0001011020251 (SC + scaleId + date + index, no separators)
-      scaleResult.scaleTransactionId = `${scaleId}${currentDate}${String(
+      // Format as SCALE_YYYYMMDD_HHMMSS_XXX
+      scaleResult.scaleTransactionId = `SCALE_${currentDate}_${currentTime}_${String(
         nextIndex
       ).padStart(3, '0')}`;
     } catch (error) {
-      // If query fails, generate with current date and index 1
+      // If query fails, generate with current date, time and index 1
       console.error('Error generating scaleTransactionId:', error);
-      const currentDate = dayjs().format('YYYYMMDD');
-      const scaleId = String(scaleResult.scaleId).padStart(3, '0');
-      scaleResult.scaleTransactionId = `${scaleId}${currentDate}001`;
+      const now = dayjs();
+      const currentDate = now.format('YYYYMMDD');
+      const currentTime = now.format('HHmmss');
+      scaleResult.scaleTransactionId = `SCALE_${currentDate}_${currentTime}_001`;
     }
   }
 });

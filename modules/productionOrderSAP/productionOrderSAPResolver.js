@@ -11,6 +11,8 @@ const ProductionOrderDetail = require('../../models/productionOrderDetail');
 const ScaleAssignment = require('../../models/scaleAssignment');
 const Material = require('../../models/material');
 const MaterialUom = require('../../models/materialUom');
+const Organization = require('../../models/organization');
+const ElementValue = require('../../models/elementValue');
 const hasPermission = require('../../middlewares/hasPermission');
 const isAuthenticated = require('../../middlewares/isAuthenticated');
 
@@ -35,6 +37,85 @@ const validateInput = (schema, data) => {
     allowUnknown: true,
   });
   if (error) joiErrorCallback(error);
+};
+
+// Helper function to fetch productionLocation (ElementValue) based on plantCode
+const attachProductionLocationToResults = async (results) => {
+  if (!results || (Array.isArray(results) && results.length === 0)) {
+    return;
+  }
+
+  const resultArray = Array.isArray(results) ? results : [results];
+
+  // Get unique plantCodes
+  const plantCodes = [
+    ...new Set(
+      resultArray
+        .map((item) => item?.plantCode)
+        .filter((code) => typeof code === 'string' && code.trim().length > 0)
+    ),
+  ];
+
+  if (plantCodes.length === 0) {
+    resultArray.forEach((item) => {
+      if (item?.setDataValue) item.setDataValue('productionLocation', null);
+    });
+    return;
+  }
+
+  // Fetch organizations by plantCode
+  const organizations = await Organization.findAll({
+    where: {
+      code: { [Sequelize.Op.in]: plantCodes },
+    },
+    attributes: ['id', 'code', 'productionLocationId'],
+  });
+
+  // Create map of plantCode -> productionLocationId
+  const plantCodeToLocationIdMap = {};
+  const productionLocationIds = [];
+
+  organizations.forEach((org) => {
+    plantCodeToLocationIdMap[org.code] = org.productionLocationId;
+    if (org.productionLocationId) {
+      productionLocationIds.push(org.productionLocationId);
+    }
+  });
+
+  // Fetch ElementValues (production locations)
+  let productionLocationMap = {};
+  if (productionLocationIds.length > 0) {
+    const elementValues = await ElementValue.findAll({
+      where: {
+        id: { [Sequelize.Op.in]: productionLocationIds },
+      },
+      attributes: ['id', 'code', 'name', 'description'],
+    });
+
+    productionLocationMap = elementValues.reduce((acc, ev) => {
+      acc[ev.id] = ev.toJSON();
+      return acc;
+    }, {});
+  }
+
+  // Attach productionLocation to each result
+  resultArray.forEach((item) => {
+    if (!item || !item.plantCode) {
+      if (item?.setDataValue) item.setDataValue('productionLocation', null);
+      return;
+    }
+
+    const productionLocationId = plantCodeToLocationIdMap[item.plantCode];
+    const productionLocation = productionLocationId
+      ? productionLocationMap[productionLocationId] || null
+      : null;
+
+    if (item.setDataValue) {
+      item.setDataValue('productionLocation', productionLocation);
+    } else {
+      item.productionLocation = productionLocation;
+    }
+  });
 };
 
 // Define association for ProductionOrderSAP hasMany ProductionOrderDetail
@@ -188,6 +269,9 @@ module.exports = {
             return productionOrderSAP;
           });
 
+          // Attach productionLocation (ElementValue) based on plantCode
+          await attachProductionLocationToResults(resultWithDescription);
+
           return {
             productionOrderSAPs: resultWithDescription,
             meta: {
@@ -242,6 +326,9 @@ module.exports = {
           // Add materialDescription to result
           const result = productionOrderSAP.toJSON();
           result.materialDescription = materialDescription;
+
+          // Attach productionLocation (ElementValue) based on plantCode
+          await attachProductionLocationToResults(result);
 
           return result;
         } catch (err) {

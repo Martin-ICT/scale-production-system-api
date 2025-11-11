@@ -23,7 +23,7 @@ module.exports = gql`
 
   input StorageLocationInputCreate {
     code: String!
-    name: String!
+    name: String
   }
 
   input StorageLocationInputUpdate {
@@ -34,7 +34,7 @@ module.exports = gql`
   type StorageLocation {
     id: ID!
     code: String!
-    name: String!
+    name: String
   }
 
   type StorageLocationPagination {

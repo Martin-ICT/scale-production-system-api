@@ -20,12 +20,17 @@ module.exports = gql`
 
   extend type Mutation {
     scaleResultsCreate(input: ScaleResultsInputCreate!): ScaleResults
+    scaleResultsBatchCreate(
+      input: ScaleResultsInputBatchCreate!
+    ): [ScaleResults!]!
+    scaleResultsUpdate(id: ID!, input: ScaleResultsInputUpdate!): ScaleResults
+    scaleResultsDelete(id: ID!): Boolean
   }
 
   input ScaleResultsInputCreate {
     scaleId: String!
     productionOrderNumber: String
-    plant: String
+    plantCode: String
     materialCode: String
     materialUom: String
     weight: Float
@@ -40,6 +45,30 @@ module.exports = gql`
     storageLocation: String
     scaleTransactionId: String
     transactionType: String
+    isSummarized: Boolean
+  }
+
+  input ScaleResultsInputBatchCreate {
+    scaleResults: [ScaleResultsInputCreate!]!
+  }
+
+  input ScaleResultsInputUpdate {
+    productionOrderNumber: String
+    plantCode: String
+    materialCode: String
+    materialUom: String
+    weight: Float
+    uom: String
+    weightConverted: Float
+    productionGroup: String
+    productionShift: Int
+    packingGroup: String
+    packingShift: Int
+    productionLot: String
+    productionLocation: String
+    storageLocation: String
+    transactionType: String
+    isSummarized: Boolean
   }
 
   type ScaleResults {
@@ -47,7 +76,7 @@ module.exports = gql`
     scaleTransactionId: String
     scaleId: String
     productionOrderNumber: String
-    plant: String
+    plantCode: String
     materialCode: String
     materialUom: String
     weight: Float
@@ -63,7 +92,7 @@ module.exports = gql`
     username: String
     storageLocation: String
     transactionType: String
-    isProcessed: Boolean!
+    isSummarized: Boolean!
     createdAt: DateTime!
   }
 
@@ -84,6 +113,7 @@ module.exports = gql`
     storageLocation: String
     scaleTransactionId: String
     transactionType: String
-    isProcessed: Boolean
+    isSummarized: Boolean
+    plantCode: String
   }
 `;

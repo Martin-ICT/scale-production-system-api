@@ -16,6 +16,25 @@ const Scale = require('../../models/scale');
 const hasPermission = require('../../middlewares/hasPermission');
 const isAuthenticated = require('../../middlewares/isAuthenticated');
 
+// Mapping GraphQL ENUM <-> Database values (same as scaleResolver)
+const UOM_MAP = {
+  // GraphQL -> Database
+  KG: 'kg',
+  G: 'g',
+  // Database -> GraphQL (string keys match DB ENUM values)
+  kg: 'KG',
+  g: 'G',
+};
+
+const STATUS_MAP = {
+  // GraphQL -> Database
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  // Database -> GraphQL (string keys match DB ENUM values)
+  active: 'ACTIVE',
+  inactive: 'INACTIVE',
+};
+
 const MATERIAL_CLIENT_ID = 1000009;
 
 const attachMaterialToDetails = async (details) => {
@@ -185,16 +204,50 @@ module.exports = {
               required: false,
               attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
             },
+            {
+              model: ScaleAssignment,
+              as: 'scaleAssignments',
+              required: false,
+              where: {
+                deletedAt: null,
+              },
+              include: [
+                {
+                  model: Scale,
+                  as: 'scale',
+                  required: false,
+                },
+              ],
+            },
           ];
 
           if (filter?.scaleId) {
-            includeOptions.push({
-              model: ScaleAssignment,
-              as: 'scaleAssignments',
-              required: true,
-              attributes: [],
-              where: { scaleId: filter.scaleId },
-            });
+            // When filtering by scaleId, make scaleAssignments required
+            includeOptions = [
+              productionOrderSAPInclude,
+              {
+                model: OrderType,
+                as: 'orderType',
+                required: false,
+                attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
+              },
+              {
+                model: ScaleAssignment,
+                as: 'scaleAssignments',
+                required: true,
+                where: {
+                  scaleId: filter.scaleId,
+                  deletedAt: null,
+                },
+                include: [
+                  {
+                    model: Scale,
+                    as: 'scale',
+                    required: false,
+                  },
+                ],
+              },
+            ];
           }
 
           const countInclude = [];
@@ -210,19 +263,15 @@ module.exports = {
           }
 
           if (filter?.scaleId) {
-            includeOptions.push({
-              model: ScaleAssignment,
-              as: 'scaleAssignments',
-              required: true,
-              attributes: [],
-              where: { scaleId: filter.scaleId },
-            });
             countInclude.push({
               model: ScaleAssignment,
               as: 'scaleAssignments',
               required: true,
               attributes: [],
-              where: { scaleId: filter.scaleId },
+              where: {
+                scaleId: filter.scaleId,
+                deletedAt: null,
+              },
             });
           }
 
@@ -244,8 +293,50 @@ module.exports = {
 
           await attachMaterialToDetails(result);
 
+          // Extract scales from scaleAssignments and convert enum values
+          const productionOrderDetails = result.map((detail) => {
+            const detailData = detail.toJSON ? detail.toJSON() : detail;
+
+            // Extract scales from scaleAssignments
+            if (
+              detailData.scaleAssignments &&
+              detailData.scaleAssignments.length > 0
+            ) {
+              detailData.scales = detailData.scaleAssignments
+                .map((assignment) => {
+                  if (!assignment.scale) return null;
+
+                  const scaleData = assignment.scale.toJSON
+                    ? assignment.scale.toJSON()
+                    : assignment.scale;
+
+                  // Convert enum values from database to GraphQL enum format
+                  if (scaleData.uom != null) {
+                    scaleData.uom =
+                      UOM_MAP[String(scaleData.uom).toLowerCase()] ||
+                      scaleData.uom.toUpperCase();
+                  }
+                  if (scaleData.status != null) {
+                    scaleData.status =
+                      STATUS_MAP[String(scaleData.status).toLowerCase()] ||
+                      scaleData.status.toUpperCase();
+                  }
+
+                  return scaleData;
+                })
+                .filter((scale) => scale !== null);
+            } else {
+              detailData.scales = [];
+            }
+
+            // Remove scaleAssignments from response as we only need scales
+            delete detailData.scaleAssignments;
+
+            return detailData;
+          });
+
           return {
-            productionOrderDetails: result,
+            productionOrderDetails: productionOrderDetails,
             meta: {
               totalItems: countResult,
               pageSize,
@@ -290,6 +381,21 @@ module.exports = {
                   as: 'orderType',
                   required: false,
                 },
+                {
+                  model: ScaleAssignment,
+                  as: 'scaleAssignments',
+                  required: false,
+                  where: {
+                    deletedAt: null,
+                  },
+                  include: [
+                    {
+                      model: Scale,
+                      as: 'scale',
+                      required: false,
+                    },
+                  ],
+                },
               ],
             }
           );
@@ -303,7 +409,44 @@ module.exports = {
 
           await attachMaterialToDetails(productionOrderDetail);
 
-          return productionOrderDetail;
+          // Extract scales from scaleAssignments and convert enum values
+          const detailData = productionOrderDetail.toJSON();
+
+          if (
+            detailData.scaleAssignments &&
+            detailData.scaleAssignments.length > 0
+          ) {
+            detailData.scales = detailData.scaleAssignments
+              .map((assignment) => {
+                if (!assignment.scale) return null;
+
+                const scaleData = assignment.scale.toJSON
+                  ? assignment.scale.toJSON()
+                  : assignment.scale;
+
+                // Convert enum values from database to GraphQL enum format
+                if (scaleData.uom != null) {
+                  scaleData.uom =
+                    UOM_MAP[String(scaleData.uom).toLowerCase()] ||
+                    scaleData.uom.toUpperCase();
+                }
+                if (scaleData.status != null) {
+                  scaleData.status =
+                    STATUS_MAP[String(scaleData.status).toLowerCase()] ||
+                    scaleData.status.toUpperCase();
+                }
+
+                return scaleData;
+              })
+              .filter((scale) => scale !== null);
+          } else {
+            detailData.scales = [];
+          }
+
+          // Remove scaleAssignments from response as we only need scales
+          delete detailData.scaleAssignments;
+
+          return detailData;
         } catch (err) {
           throw err;
         }
@@ -813,6 +956,66 @@ module.exports = {
           error
         );
         return null;
+      }
+    },
+    scales: async (productionOrderDetail) => {
+      try {
+        // If scales are already attached (from productionOrderDetailList), return them
+        if (productionOrderDetail.scales) {
+          return productionOrderDetail.scales;
+        }
+
+        // Otherwise, fetch from database through ScaleAssignment
+        const scaleAssignments = await ScaleAssignment.findAll({
+          where: {
+            productionOrderDetailId: productionOrderDetail.id,
+            deletedAt: null,
+          },
+          include: [
+            {
+              model: Scale,
+              as: 'scale',
+              required: false,
+            },
+          ],
+        });
+
+        if (!scaleAssignments || scaleAssignments.length === 0) {
+          return [];
+        }
+
+        // Extract scales and convert enum values
+        const scales = scaleAssignments
+          .map((assignment) => {
+            if (!assignment.scale) return null;
+
+            const scaleData = assignment.scale.toJSON
+              ? assignment.scale.toJSON()
+              : assignment.scale;
+
+            // Convert enum values from database to GraphQL enum format
+            if (scaleData.uom != null) {
+              scaleData.uom =
+                UOM_MAP[String(scaleData.uom).toLowerCase()] ||
+                scaleData.uom.toUpperCase();
+            }
+            if (scaleData.status != null) {
+              scaleData.status =
+                STATUS_MAP[String(scaleData.status).toLowerCase()] ||
+                scaleData.status.toUpperCase();
+            }
+
+            return scaleData;
+          })
+          .filter((scale) => scale !== null);
+
+        return scales;
+      } catch (error) {
+        console.error(
+          'Error fetching scales for ProductionOrderDetail:',
+          error
+        );
+        return [];
       }
     },
   },

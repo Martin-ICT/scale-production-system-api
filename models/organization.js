@@ -24,6 +24,15 @@ const Organization = sequelizeWms.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    productionLocationId: {
+      field: 'z_production_location_id',
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'c_elementvalue',
+        key: 'c_elementvalue_id',
+      },
+    },
   },
   {
     freezeTableName: true,

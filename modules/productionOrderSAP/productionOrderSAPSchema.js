@@ -37,6 +37,7 @@ module.exports = gql`
     id: Int!
     productionOrderNumber: String!
     plantCode: String!
+    productionLocation: ElementValue
     orderTypeCode: String!
     materialCode: String!
     materialDescription: String

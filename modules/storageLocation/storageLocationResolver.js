@@ -13,12 +13,12 @@ const isAuthenticated = require('../../middlewares/isAuthenticated');
 const validationSchemas = {
   storageLocationCreate: Joi.object({
     code: Joi.string().required(),
-    name: Joi.string().required(),
+    name: Joi.string().optional().allow(null, ''),
   }),
   storageLocationUpdate: Joi.object({
     id: Joi.number().integer().required(),
-    code: Joi.string().required(),
-    name: Joi.string().required(),
+    code: Joi.string().optional(),
+    name: Joi.string().optional().allow(null, ''),
   }),
   storageLocationDelete: Joi.object({
     id: Joi.number().integer().required(),
@@ -37,7 +37,6 @@ const validateInput = (schema, data) => {
 module.exports = {
   Query: {
     storageLocationList: combineResolvers(
-
       isAuthenticated,
       // hasPermission('storageLocation.read'),
       pageMinCheckAndPageSizeMax,
@@ -102,8 +101,6 @@ module.exports = {
     ),
 
     storageLocationDetail: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('storageLocation.read'),
       async (_, { id }) => {
@@ -127,7 +124,6 @@ module.exports = {
 
   Mutation: {
     storageLocationCreate: combineResolvers(
-
       isAuthenticated,
       // hasPermission('storageLocation.create'),
       async (_, { input }) => {
@@ -136,15 +132,16 @@ module.exports = {
         const transaction = await StorageLocation.sequelize.transaction();
 
         try {
+          // Check for duplicate code (code is unique)
           const existingStorageLocation = await StorageLocation.findOne({
             where: {
-              [Sequelize.Op.or]: [{ code: input.code }, { name: input.name }],
+              code: input.code,
             },
           });
 
           if (existingStorageLocation) {
             throw new ApolloError(
-              'A storage location with the same code or name already exists',
+              'A storage location with the same code already exists',
               apolloErrorCodes.BAD_DATA_VALIDATION
             );
           }
@@ -163,8 +160,6 @@ module.exports = {
     ),
 
     storageLocationUpdate: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('storageLocation.update'),
       async (_, { id, input }) => {
@@ -184,20 +179,18 @@ module.exports = {
             );
           }
 
-          if (
-            (input.code && input.code !== storageLocation.code) ||
-            (input.name && input.name !== storageLocation.name)
-          ) {
+          // Check for duplicate code if code is being updated
+          if (input.code && input.code !== storageLocation.code) {
             const existingStorageLocation = await StorageLocation.findOne({
               where: {
-                [Sequelize.Op.or]: [{ code: input.code }, { name: input.name }],
+                code: input.code,
                 id: { [Sequelize.Op.ne]: id },
               },
             });
 
             if (existingStorageLocation) {
               throw new ApolloError(
-                'A storage location with the same code or name already exists',
+                'A storage location with the same code already exists',
                 apolloErrorCodes.BAD_DATA_VALIDATION
               );
             }
@@ -215,8 +208,6 @@ module.exports = {
     ),
 
     storageLocationDelete: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('storageLocation.delete'),
       async (_, { id }) => {

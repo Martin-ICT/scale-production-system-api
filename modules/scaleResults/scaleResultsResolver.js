@@ -5,6 +5,7 @@ const { Sequelize } = require('sequelize');
 const apolloErrorCodes = require('../../constants/apolloErrorCodes');
 const pageMinCheckAndPageSizeMax = require('../../middlewares/pageMinCheckAndPageSizeMax');
 const { joiErrorCallback } = require('../../helpers/errorHelper');
+const definedSearch = require('../../helpers/definedSearch');
 const ScaleResults = require('../../models/scaleResults');
 const hasPermission = require('../../middlewares/hasPermission');
 const isAuthenticated = require('../../middlewares/isAuthenticated');
@@ -12,22 +13,83 @@ const isAuthenticated = require('../../middlewares/isAuthenticated');
 const validationSchemas = {
   scaleResultsCreate: Joi.object({
     scaleId: Joi.string().required().max(10),
-    productionOrderNumber: Joi.string().max(20).optional(),
-    plant: Joi.string().max(4).optional(),
-    materialCode: Joi.string().max(10).optional(),
-    materialUom: Joi.string().max(10).optional(),
-    weight: Joi.number().optional(),
-    uom: Joi.string().max(10).optional(),
-    weightConverted: Joi.number().optional(),
-    productionGroup: Joi.string().max(2).optional(),
-    productionShift: Joi.number().integer().optional(),
-    packingGroup: Joi.string().max(2).optional(),
-    packingShift: Joi.number().integer().optional(),
-    productionLot: Joi.string().max(2).optional(),
-    productionLocation: Joi.string().max(2).optional(),
-    storageLocation: Joi.string().max(4).optional(),
-    scaleTransactionId: Joi.string().max(30).optional(),
-    transactionType: Joi.string().max(2).valid('GI', 'GR').optional(),
+    productionOrderNumber: Joi.string().max(20).optional().allow(null, ''),
+    plantCode: Joi.string().max(10).optional().allow(null, ''),
+    materialCode: Joi.string().max(10).optional().allow(null, ''),
+    materialUom: Joi.string().max(10).optional().allow(null, ''),
+    weight: Joi.number().optional().allow(null),
+    uom: Joi.string().max(10).optional().allow(null, ''),
+    weightConverted: Joi.number().optional().allow(null),
+    productionGroup: Joi.string().max(2).optional().allow(null, ''),
+    productionShift: Joi.number().integer().optional().allow(null),
+    packingGroup: Joi.string().max(10).optional().allow(null, ''),
+    packingShift: Joi.number().integer().optional().allow(null),
+    productionLot: Joi.string().max(10).optional().allow(null, ''),
+    productionLocation: Joi.string().max(10).optional().allow(null, ''),
+    storageLocation: Joi.string().max(10).optional().allow(null, ''),
+    scaleTransactionId: Joi.string().max(30).optional().allow(null, ''),
+    transactionType: Joi.string()
+      .max(2)
+      .valid('GI', 'GR')
+      .optional()
+      .allow(null, ''),
+    isSummarized: Joi.boolean().optional(),
+  }),
+  scaleResultsBatchCreate: Joi.object({
+    scaleResults: Joi.array()
+      .items(
+        Joi.object({
+          scaleId: Joi.string().required().max(10),
+          productionOrderNumber: Joi.string()
+            .max(20)
+            .optional()
+            .allow(null, ''),
+          plantCode: Joi.string().max(10).optional().allow(null, ''),
+          materialCode: Joi.string().max(10).optional().allow(null, ''),
+          materialUom: Joi.string().max(10).optional().allow(null, ''),
+          weight: Joi.number().optional().allow(null),
+          uom: Joi.string().max(10).optional().allow(null, ''),
+          weightConverted: Joi.number().optional().allow(null),
+          productionGroup: Joi.string().max(2).optional().allow(null, ''),
+          productionShift: Joi.number().integer().optional().allow(null),
+          packingGroup: Joi.string().max(10).optional().allow(null, ''),
+          packingShift: Joi.number().integer().optional().allow(null),
+          productionLot: Joi.string().max(10).optional().allow(null, ''),
+          productionLocation: Joi.string().max(10).optional().allow(null, ''),
+          storageLocation: Joi.string().max(10).optional().allow(null, ''),
+          scaleTransactionId: Joi.string().max(30).optional().allow(null, ''),
+          transactionType: Joi.string()
+            .max(2)
+            .valid('GI', 'GR')
+            .optional()
+            .allow(null, ''),
+          isSummarized: Joi.boolean().optional(),
+        })
+      )
+      .min(1)
+      .required(),
+  }),
+  scaleResultsUpdate: Joi.object({
+    productionOrderNumber: Joi.string().max(20).optional().allow(null, ''),
+    plantCode: Joi.string().max(10).optional().allow(null, ''),
+    materialCode: Joi.string().max(10).optional().allow(null, ''),
+    materialUom: Joi.string().max(10).optional().allow(null, ''),
+    weight: Joi.number().optional().allow(null),
+    uom: Joi.string().max(10).optional().allow(null, ''),
+    weightConverted: Joi.number().optional().allow(null),
+    productionGroup: Joi.string().max(2).optional().allow(null, ''),
+    productionShift: Joi.number().integer().optional().allow(null),
+    packingGroup: Joi.string().max(10).optional().allow(null, ''),
+    packingShift: Joi.number().integer().optional().allow(null),
+    productionLot: Joi.string().max(10).optional().allow(null, ''),
+    productionLocation: Joi.string().max(10).optional().allow(null, ''),
+    storageLocation: Joi.string().max(10).optional().allow(null, ''),
+    transactionType: Joi.string()
+      .max(2)
+      .valid('GI', 'GR')
+      .optional()
+      .allow(null, ''),
+    isSummarized: Joi.boolean().optional(),
   }),
 };
 
@@ -38,6 +100,25 @@ const validateInput = (schema, data) => {
     allowUnknown: true,
   });
   if (error) joiErrorCallback(error);
+};
+
+// Helper function to map weightConverted to weight_converted and vice versa
+const mapScaleResultForDB = (input) => {
+  const payload = { ...input };
+  if (payload.weightConverted !== undefined) {
+    payload.weight_converted = payload.weightConverted;
+    delete payload.weightConverted;
+  }
+  return payload;
+};
+
+const mapScaleResultForResponse = (result) => {
+  const data = result.toJSON ? result.toJSON() : result;
+  if (data.weight_converted !== undefined) {
+    data.weightConverted = data.weight_converted;
+    delete data.weight_converted;
+  }
+  return data;
 };
 
 module.exports = {
@@ -69,6 +150,9 @@ module.exports = {
           if (filter?.materialCode) {
             whereClause.materialCode = filter.materialCode;
           }
+          if (filter?.plantCode) {
+            whereClause.plantCode = filter.plantCode;
+          }
           if (filter?.productionGroup) {
             whereClause.productionGroup = filter.productionGroup;
           }
@@ -93,33 +177,22 @@ module.exports = {
           if (filter?.transactionType) {
             whereClause.transactionType = filter.transactionType;
           }
-          if (filter?.isProcessed !== undefined) {
-            whereClause.isProcessed = filter.isProcessed;
+          if (filter?.isSummarized !== undefined) {
+            whereClause.isSummarized = filter.isSummarized;
           }
 
           // Apply search if provided
           if (search) {
-            const searchClause = {
-              [Sequelize.Op.or]: [
-                { scaleId: { [Sequelize.Op.iLike]: `%${search}%` } },
-                {
-                  productionOrderNumber: {
-                    [Sequelize.Op.iLike]: `%${search}%`,
-                  },
-                },
-                { materialCode: { [Sequelize.Op.iLike]: `%${search}%` } },
-                { scaleTransactionId: { [Sequelize.Op.iLike]: `%${search}%` } },
-                { username: { [Sequelize.Op.iLike]: `%${search}%` } },
+            whereClause = definedSearch({
+              query: search,
+              inColumns: [
+                'scaleId',
+                'productionOrderNumber',
+                'materialCode',
+                'scaleTransactionId',
+                'username',
               ],
-            };
-            // Combine filters and search using AND if there are filters
-            if (Object.keys(whereClause).length > 0) {
-              whereClause = {
-                [Sequelize.Op.and]: [whereClause, searchClause],
-              };
-            } else {
-              whereClause = searchClause;
-            }
+            });
           }
 
           const countResult = await ScaleResults.count({
@@ -136,12 +209,7 @@ module.exports = {
           });
 
           // Map weight_converted to weightConverted for GraphQL response
-          const scaleResults = result.map((item) => {
-            const itemData = item.toJSON();
-            itemData.weightConverted = itemData.weight_converted;
-            delete itemData.weight_converted;
-            return itemData;
-          });
+          const scaleResults = result.map(mapScaleResultForResponse);
 
           return {
             scaleResults: scaleResults,
@@ -172,12 +240,7 @@ module.exports = {
             );
           }
 
-          // Map weight_converted to weightConverted for GraphQL response
-          const result = scaleResult.toJSON();
-          result.weightConverted = result.weight_converted;
-          delete result.weight_converted;
-
-          return result;
+          return mapScaleResultForResponse(scaleResult);
         } catch (err) {
           throw err;
         }
@@ -216,12 +279,7 @@ module.exports = {
           });
 
           // Map weight_converted to weightConverted for GraphQL response
-          const scaleResults = result.map((item) => {
-            const itemData = item.toJSON();
-            itemData.weightConverted = itemData.weight_converted;
-            delete itemData.weight_converted;
-            return itemData;
-          });
+          const scaleResults = result.map(mapScaleResultForResponse);
 
           return {
             scaleResults: scaleResults,
@@ -248,15 +306,15 @@ module.exports = {
 
         try {
           // Map weightConverted to weight_converted for database
-          const payload = {
+          const payload = mapScaleResultForDB({
             scaleId: input.scaleId,
             productionOrderNumber: input.productionOrderNumber,
-            plant: input.plant,
+            plantCode: input.plantCode,
             materialCode: input.materialCode,
             materialUom: input.materialUom,
             weight: input.weight,
             uom: input.uom,
-            weight_converted: input.weightConverted,
+            weightConverted: input.weightConverted,
             productionGroup: input.productionGroup,
             productionShift: input.productionShift,
             packingGroup: input.packingGroup,
@@ -268,7 +326,8 @@ module.exports = {
             storageLocation: input.storageLocation,
             scaleTransactionId: input.scaleTransactionId,
             transactionType: input.transactionType,
-          };
+            isSummarized: input.isSummarized ?? false,
+          });
 
           const newScaleResults = await ScaleResults.create(payload, {
             transaction,
@@ -276,12 +335,120 @@ module.exports = {
 
           await transaction.commit();
 
-          // Map weight_converted back to weightConverted for GraphQL response
-          const result = newScaleResults.toJSON();
-          result.weightConverted = result.weight_converted;
-          delete result.weight_converted;
+          return mapScaleResultForResponse(newScaleResults);
+        } catch (err) {
+          await transaction.rollback();
+          throw err;
+        }
+      }
+    ),
 
-          return result;
+    scaleResultsBatchCreate: combineResolvers(
+      isAuthenticated,
+      // hasPermission('scaleResults.create'),
+      async (_, { input }, { user }) => {
+        validateInput(validationSchemas.scaleResultsBatchCreate, input);
+        const transaction = await ScaleResults.sequelize.transaction();
+
+        try {
+          // Map all inputs for database
+          const payloadsToCreate = input.scaleResults.map((item) =>
+            mapScaleResultForDB({
+              scaleId: item.scaleId,
+              productionOrderNumber: item.productionOrderNumber,
+              plantCode: item.plantCode,
+              materialCode: item.materialCode,
+              materialUom: item.materialUom,
+              weight: item.weight,
+              uom: item.uom,
+              weightConverted: item.weightConverted,
+              productionGroup: item.productionGroup,
+              productionShift: item.productionShift,
+              packingGroup: item.packingGroup,
+              packingShift: item.packingShift,
+              productionLot: item.productionLot,
+              productionLocation: item.productionLocation,
+              userId: user?.userId || null,
+              username: user?.name || null,
+              storageLocation: item.storageLocation,
+              scaleTransactionId: item.scaleTransactionId,
+              transactionType: item.transactionType,
+              isSummarized: item.isSummarized ?? false,
+            })
+          );
+
+          const newScaleResults = await ScaleResults.bulkCreate(
+            payloadsToCreate,
+            {
+              transaction,
+              returning: true,
+            }
+          );
+
+          await transaction.commit();
+
+          // Map weight_converted back to weightConverted for GraphQL response
+          return newScaleResults.map(mapScaleResultForResponse);
+        } catch (err) {
+          await transaction.rollback();
+          throw err;
+        }
+      }
+    ),
+
+    scaleResultsUpdate: combineResolvers(
+      isAuthenticated,
+      // hasPermission('scaleResults.update'),
+      async (_, { id, input }, { user }) => {
+        validateInput(validationSchemas.scaleResultsUpdate, input);
+        const transaction = await ScaleResults.sequelize.transaction();
+
+        try {
+          const scaleResult = await ScaleResults.findByPk(id);
+
+          if (!scaleResult) {
+            throw new ApolloError(
+              'ScaleResults not found',
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          // Map weightConverted to weight_converted for database
+          const updatePayload = mapScaleResultForDB(input);
+
+          await scaleResult.update(updatePayload, { transaction });
+
+          await transaction.commit();
+
+          return mapScaleResultForResponse(scaleResult);
+        } catch (err) {
+          await transaction.rollback();
+          throw err;
+        }
+      }
+    ),
+
+    scaleResultsDelete: combineResolvers(
+      isAuthenticated,
+      // hasPermission('scaleResults.delete'),
+      async (_, { id }) => {
+        const transaction = await ScaleResults.sequelize.transaction();
+
+        try {
+          const scaleResult = await ScaleResults.findByPk(id);
+
+          if (!scaleResult) {
+            throw new ApolloError(
+              'ScaleResults not found',
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          await scaleResult.destroy({ transaction, force: true });
+
+          await transaction.commit();
+
+          return true;
         } catch (err) {
           await transaction.rollback();
           throw err;
