@@ -170,6 +170,37 @@ module.exports = {
             whereClause.status = filter.status;
           }
 
+          // Handle date range filter using DateFilter (general name for reusability)
+          if (filter?.date) {
+            const { startDate, endDate } = filter.date;
+            if (startDate && endDate) {
+              // Both dates provided: filter by range
+              // Set startDate to start of day (00:00:00.000) and endDate to end of day (23:59:59.999)
+              const fromDate = new Date(startDate);
+              fromDate.setHours(0, 0, 0, 0);
+              const toDate = new Date(endDate);
+              toDate.setHours(23, 59, 59, 999);
+
+              whereClause.productionDate = {
+                [Sequelize.Op.between]: [fromDate, toDate],
+              };
+            } else if (startDate) {
+              // Only startDate provided: filter from this date onwards (start of day)
+              const fromDate = new Date(startDate);
+              fromDate.setHours(0, 0, 0, 0);
+              whereClause.productionDate = {
+                [Sequelize.Op.gte]: fromDate,
+              };
+            } else if (endDate) {
+              // Only endDate provided: filter up to this date (end of day)
+              const toDate = new Date(endDate);
+              toDate.setHours(23, 59, 59, 999);
+              whereClause.productionDate = {
+                [Sequelize.Op.lte]: toDate,
+              };
+            }
+          }
+
           // Handle scaleId filter through ScaleAssignment -> ProductionOrderDetail -> ProductionOrderSAP
           let includeOptions = [
             {

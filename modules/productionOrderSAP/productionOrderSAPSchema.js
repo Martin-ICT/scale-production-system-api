@@ -61,5 +61,6 @@ module.exports = gql`
     orderTypeCode: String
     status: Int
     scaleId: ID
+    date: DateFilter
   }
 `;
