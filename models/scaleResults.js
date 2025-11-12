@@ -135,8 +135,13 @@ ScaleResults.addHook('beforeCreate', async (scaleResult, options) => {
     throw new Error('scaleId is required for creating scale results');
   }
 
-  // Generate scaleTransactionId if not provided
-  if (!scaleResult.scaleTransactionId) {
+  // Generate scaleTransactionId ONLY if not provided (don't override existing one)
+  // Check both null and empty string
+  if (
+    !scaleResult.scaleTransactionId ||
+    (typeof scaleResult.scaleTransactionId === 'string' &&
+      scaleResult.scaleTransactionId.trim() === '')
+  ) {
     try {
       // Get current date and time
       const now = dayjs();

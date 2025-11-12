@@ -279,8 +279,6 @@ module.exports = {
           ],
         });
 
-        console.log('GILA');
-
         // Extract and return all orderTypes
         return materialOrderTypes
           .map((mot) => mot.orderType)

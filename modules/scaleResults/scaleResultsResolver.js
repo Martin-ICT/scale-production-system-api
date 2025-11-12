@@ -351,6 +351,42 @@ module.exports = {
         const transaction = await ScaleResults.sequelize.transaction();
 
         try {
+          // Check for duplicate scaleTransactionId in input
+          const providedTransactionIds = input.scaleResults
+            .map((item) => item.scaleTransactionId)
+            .filter((id) => id && id.trim().length > 0);
+
+          if (providedTransactionIds.length > 0) {
+            const uniqueIds = [...new Set(providedTransactionIds)];
+            if (uniqueIds.length !== providedTransactionIds.length) {
+              throw new ApolloError(
+                'Duplicate scaleTransactionId found in input',
+                apolloErrorCodes.BAD_DATA_VALIDATION
+              );
+            }
+
+            // Check if any of the provided scaleTransactionIds already exist in database
+            const existingResults = await ScaleResults.findAll({
+              where: {
+                scaleTransactionId: { [Sequelize.Op.in]: uniqueIds },
+              },
+              attributes: ['scaleTransactionId'],
+              transaction,
+            });
+
+            if (existingResults.length > 0) {
+              const existingIds = existingResults.map(
+                (r) => r.scaleTransactionId
+              );
+              throw new ApolloError(
+                `ScaleTransactionId(s) already exist: ${existingIds.join(
+                  ', '
+                )}`,
+                apolloErrorCodes.BAD_DATA_VALIDATION
+              );
+            }
+          }
+
           // Map all inputs for database
           const payloadsToCreate = input.scaleResults.map((item) =>
             mapScaleResultForDB({
@@ -371,7 +407,7 @@ module.exports = {
               userId: user?.userId || null,
               username: user?.name || null,
               storageLocation: item.storageLocation,
-              scaleTransactionId: item.scaleTransactionId,
+              scaleTransactionId: item.scaleTransactionId, // If provided, will not be overridden by hook
               transactionType: item.transactionType,
               isSummarized: item.isSummarized ?? false,
             })
@@ -382,6 +418,7 @@ module.exports = {
             {
               transaction,
               returning: true,
+              individualHooks: true, // Ensure hooks run for each record
             }
           );
 

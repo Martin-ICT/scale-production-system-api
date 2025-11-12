@@ -616,7 +616,6 @@ const getID3 = async () => {
 const getStableWeight = async () => {
   try {
     const result = await sendCommand('S');
-    console.log('GILA', result);
 
     // Parse weight response (format: +1250.5 g or similar)
     const weightMatch = result.raw.match(/^([+-]?\d+\.?\d*)\s*([a-zA-Z]*)$/);

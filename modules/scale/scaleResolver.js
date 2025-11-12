@@ -184,11 +184,6 @@ module.exports = {
                     required: false,
                     include: [
                       {
-                        model: ProductionOrderSAP,
-                        as: 'productionOrderSAP',
-                        required: false,
-                      },
-                      {
                         model: OrderType,
                         as: 'orderType',
                         required: false,
@@ -215,24 +210,72 @@ module.exports = {
                 STATUS_MAP[String(scaleData.status).toLowerCase()] ||
                 scaleData.status.toUpperCase();
             }
-            // Extract productionOrderDetail from scaleAssignments
-            // Filter out details that have null productionOrderSAP to avoid GraphQL errors
+            // Extract productionOrderDetails from scaleAssignments
             if (
               scaleData.scaleAssignments &&
               scaleData.scaleAssignments.length > 0
             ) {
               scaleData.productionOrderDetails = scaleData.scaleAssignments
                 .map((assignment) => assignment.productionOrderDetail)
-                .filter(
-                  (detail) =>
-                    detail !== null && detail.productionOrderSAP !== null
-                );
+                .filter((detail) => detail !== null && detail !== undefined);
             } else {
-              scaleData.productionOrderDetail = [];
+              scaleData.productionOrderDetails = [];
             }
-            // Remove scaleAssignments from response as we only need productionOrderDetail
+            // Remove scaleAssignments from response as we only need productionOrderDetails
             delete scaleData.scaleAssignments;
             return scaleData;
+          });
+
+          // Collect all productionOrderIds from all scales
+          const productionOrderIds = [
+            ...new Set(
+              scales
+                .flatMap((scale) => scale.productionOrderDetails || [])
+                .map((detail) => detail?.productionOrderId)
+                .filter((id) => id !== null && id !== undefined)
+            ),
+          ];
+
+          // Fetch all ProductionOrderSAP records in one query
+          const productionOrderSAPMap = new Map();
+          if (productionOrderIds.length > 0) {
+            const productionOrderSAPs = await ProductionOrderSAP.findAll({
+              where: {
+                id: { [Sequelize.Op.in]: productionOrderIds },
+              },
+            });
+
+            productionOrderSAPs.forEach((sap) => {
+              productionOrderSAPMap.set(sap.id, sap.toJSON());
+            });
+          }
+
+          // Attach ProductionOrderSAP to each productionOrderDetail
+          scales.forEach((scale) => {
+            if (
+              scale.productionOrderDetails &&
+              scale.productionOrderDetails.length > 0
+            ) {
+              scale.productionOrderDetails = scale.productionOrderDetails
+                .map((detail) => {
+                  if (!detail) return null;
+
+                  const productionOrderSAP = productionOrderSAPMap.get(
+                    detail.productionOrderId
+                  );
+
+                  // Only include detail if it has productionOrderSAP with productionOrderNumber
+                  if (
+                    productionOrderSAP &&
+                    productionOrderSAP.productionOrderNumber
+                  ) {
+                    detail.productionOrderSAP = productionOrderSAP;
+                    return detail;
+                  }
+                  return null;
+                })
+                .filter((detail) => detail !== null && detail !== undefined);
+            }
           });
 
           return {
@@ -271,11 +314,6 @@ module.exports = {
                     required: false,
                     include: [
                       {
-                        model: ProductionOrderSAP,
-                        as: 'productionOrderSAP',
-                        required: false,
-                      },
-                      {
                         model: OrderType,
                         as: 'orderType',
                         required: false,
@@ -307,23 +345,68 @@ module.exports = {
               STATUS_MAP[String(scaleData.status).toLowerCase()] ||
               scaleData.status.toUpperCase();
           }
-          // Extract productionOrderDetail from scaleAssignments
-          // Filter out details that have null productionOrderSAP to avoid GraphQL errors
+          // Extract productionOrderDetails from scaleAssignments
           if (
             scaleData.scaleAssignments &&
             scaleData.scaleAssignments.length > 0
           ) {
             scaleData.productionOrderDetails = scaleData.scaleAssignments
               .map((assignment) => assignment.productionOrderDetail)
-              .filter(
-                (detail) =>
-                  detail !== null && detail.productionOrderSAP !== null
-              );
+              .filter((detail) => detail !== null && detail !== undefined);
           } else {
-            scaleData.productionOrderDetail = [];
+            scaleData.productionOrderDetails = [];
           }
-          // Remove scaleAssignments from response as we only need productionOrderDetail
+          // Remove scaleAssignments from response as we only need productionOrderDetails
           delete scaleData.scaleAssignments;
+
+          // Collect all productionOrderIds from productionOrderDetails
+          const productionOrderIds = [
+            ...new Set(
+              (scaleData.productionOrderDetails || [])
+                .map((detail) => detail?.productionOrderId)
+                .filter((id) => id !== null && id !== undefined)
+            ),
+          ];
+
+          // Fetch all ProductionOrderSAP records in one query
+          const productionOrderSAPMap = new Map();
+          if (productionOrderIds.length > 0) {
+            const productionOrderSAPs = await ProductionOrderSAP.findAll({
+              where: {
+                id: { [Sequelize.Op.in]: productionOrderIds },
+              },
+            });
+
+            productionOrderSAPs.forEach((sap) => {
+              productionOrderSAPMap.set(sap.id, sap.toJSON());
+            });
+          }
+
+          // Attach ProductionOrderSAP to each productionOrderDetail
+          if (
+            scaleData.productionOrderDetails &&
+            scaleData.productionOrderDetails.length > 0
+          ) {
+            scaleData.productionOrderDetails = scaleData.productionOrderDetails
+              .map((detail) => {
+                if (!detail) return null;
+
+                const productionOrderSAP = productionOrderSAPMap.get(
+                  detail.productionOrderId
+                );
+
+                // Only include detail if it has productionOrderSAP with productionOrderNumber
+                if (
+                  productionOrderSAP &&
+                  productionOrderSAP.productionOrderNumber
+                ) {
+                  detail.productionOrderSAP = productionOrderSAP;
+                  return detail;
+                }
+                return null;
+              })
+              .filter((detail) => detail !== null && detail !== undefined);
+          }
 
           return scaleData;
         } catch (err) {

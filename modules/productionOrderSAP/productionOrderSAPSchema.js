@@ -35,18 +35,18 @@ module.exports = gql`
 
   type ProductionOrderSAP {
     id: Int!
-    productionOrderNumber: String!
-    plantCode: String!
+    productionOrderNumber: String
+    plantCode: String
     productionLocation: ElementValue
-    orderTypeCode: String!
-    materialCode: String!
+    orderTypeCode: String
+    materialCode: String
     materialDescription: String
-    targetWeight: Int!
-    productionDate: DateTime!
+    targetWeight: Int
+    productionDate: DateTime
     productionOrderDetails: [ProductionOrderDetail]
     suitability: Int
-    status: Int!
-    createdAt: DateTime!
+    status: Int
+    createdAt: DateTime
   }
 
   type ProductionOrderSAPPagination {

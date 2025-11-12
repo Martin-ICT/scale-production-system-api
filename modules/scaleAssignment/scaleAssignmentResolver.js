@@ -48,6 +48,13 @@ const validationSchemas = {
     scaleId: Joi.number().integer().optional(),
     productionOrderDetailId: Joi.number().integer().optional(),
   }),
+  scaleAssignmentBatchDelete: Joi.object({
+    scaleId: Joi.number().integer().required(),
+    productionOrderDetailIds: Joi.array()
+      .items(Joi.number().integer().required())
+      .min(1)
+      .required(),
+  }),
 };
 
 const validateInput = (schema, data) => {
@@ -737,6 +744,73 @@ module.exports = {
           }
 
           await scaleAssignment.destroy({ transaction });
+
+          await transaction.commit();
+          return true;
+        } catch (err) {
+          await transaction.rollback();
+          throw err;
+        }
+      }
+    ),
+
+    scaleAssignmentBatchDelete: combineResolvers(
+      isAuthenticated,
+      // hasPermission('scaleAssignment.delete'),
+      async (_, { input }) => {
+        validateInput(validationSchemas.scaleAssignmentBatchDelete, input);
+        const transaction = await ScaleAssignment.sequelize.transaction();
+
+        try {
+          // Validate Scale exists
+          const scale = await Scale.findByPk(input.scaleId, { transaction });
+          if (!scale) {
+            throw new ApolloError(
+              'Scale not found',
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          // Validate ProductionOrderDetails exist
+          const productionOrderDetails = await ProductionOrderDetail.findAll({
+            where: {
+              id: { [Sequelize.Op.in]: input.productionOrderDetailIds },
+            },
+            transaction,
+          });
+
+          if (
+            productionOrderDetails.length !==
+            input.productionOrderDetailIds.length
+          ) {
+            const foundIds = productionOrderDetails.map((detail) => detail.id);
+            const missingIds = input.productionOrderDetailIds.filter(
+              (id) => !foundIds.includes(id)
+            );
+            throw new ApolloError(
+              `ProductionOrderDetail(s) not found: ${missingIds.join(', ')}`,
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          // Find and delete all matching ScaleAssignments
+          const deletedCount = await ScaleAssignment.destroy({
+            where: {
+              scaleId: input.scaleId,
+              productionOrderDetailId: {
+                [Sequelize.Op.in]: input.productionOrderDetailIds,
+              },
+              deletedAt: null, // Only delete non-deleted records
+            },
+            transaction,
+          });
+
+          if (deletedCount === 0) {
+            throw new ApolloError(
+              'No Scale Assignments found to delete',
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
 
           await transaction.commit();
           return true;

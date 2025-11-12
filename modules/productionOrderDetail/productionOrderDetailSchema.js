@@ -76,6 +76,7 @@ module.exports = gql`
     updatedAt: DateTime!
     deletedAt: DateTime
     productionOrderSAP: ProductionOrderSAP
+    productionOrderNumber: String
     orderType: OrderType
     material: Material
     scales: [Scale]
