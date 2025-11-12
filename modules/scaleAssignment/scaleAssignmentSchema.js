@@ -34,9 +34,7 @@ module.exports = gql`
       input: ScaleAssignmentInputUpdate!
     ): ScaleAssignment
     scaleAssignmentDelete(id: ID!): Boolean
-    scaleAssignmentBatchDelete(
-      input: ScaleAssignmentInputBatchDelete!
-    ): Boolean
+    scaleAssignmentBatchDelete(input: ScaleAssignmentInputBatchDelete!): Boolean
   }
 
   input ScaleAssignmentInputCreate {
