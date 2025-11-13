@@ -3,36 +3,6 @@ const Sequelize = require('sequelize');
 const sequelize = require('../db');
 
 // Helper function to generate batch ID
-const generateBatchId = async (plantCode, model) => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  const dateString = `${year}${month}${day}`;
-
-  const prefix = `SUM${plantCode}${dateString}`;
-
-  // Find the highest batch ID for today with the same plant code
-  const lastBatch = await model.findOne({
-    where: {
-      batchId: {
-        [Sequelize.Op.like]: `${prefix}%`,
-      },
-    },
-    order: [['batchId', 'DESC']],
-  });
-
-  let nextNumber = 1;
-  if (lastBatch) {
-    const lastBatchId = lastBatch.batchId;
-    const lastNumber = parseInt(lastBatchId.substring(prefix.length));
-    if (!isNaN(lastNumber)) {
-      nextNumber = lastNumber + 1;
-    }
-  }
-
-  return `${prefix}${String(nextNumber).padStart(4, '0')}`;
-};
 
 const WeightSummaryBatch = sequelize.define(
   'weight_summary_batch',
@@ -53,16 +23,6 @@ const WeightSummaryBatch = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
-    // plantCode: {
-    //   field: 'plant_code',
-    //   type: DataTypes.STRING(10),
-    //   allowNull: false,
-    // },
-    // productionOrderDetailId: {
-    //   field: 'production_order_number',
-    //   type: DataTypes.STRING(20),
-    //   allowNull: false,
-    // },
     productionOrderDetailId: {
       field: 'production_order_detail_id',
       type: DataTypes.INTEGER,
@@ -72,11 +32,6 @@ const WeightSummaryBatch = sequelize.define(
         key: 'id',
       },
     },
-    // materialCode: {
-    //   field: 'material_code',
-    //   type: DataTypes.STRING(10),
-    //   allowNull: false,
-    // },
     batchId: {
       field: 'batch_id',
       type: DataTypes.STRING(20),
@@ -130,16 +85,6 @@ const WeightSummaryBatch = sequelize.define(
     paranoid: true,
   }
 );
-
-// Hook to auto-generate batch ID before creating
-WeightSummaryBatch.beforeCreate(async (instance) => {
-  if (!instance.batchId && instance.plantCode) {
-    instance.batchId = await generateBatchId(
-      instance.plantCode,
-      WeightSummaryBatch
-    );
-  }
-});
 
 WeightSummaryBatch.associate = (models) => {
   WeightSummaryBatch.belongsTo(models.ProductionOrderDetail, {

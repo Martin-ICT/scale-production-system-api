@@ -15,6 +15,7 @@ const materialSchema = require('./modules/material/materialSchema');
 const materialOrderTypeSchema = require('./modules/materialOrderType/materialOrderTypeSchema');
 const elementValueSchema = require('./modules/elementValue/elementValueSchema');
 const authSchema = require('./modules/auth/authSchema');
+const weightSummaryBatchSchema = require('./modules/weightSummaryBatch/weightSummaryBatchSchema');
 
 //shared
 const dateFilterSchema = require('./modules/shared/schemas/dateFilter');
@@ -48,6 +49,7 @@ module.exports = gql`
   ${materialSchema}
   ${materialOrderTypeSchema}
   ${elementValueSchema}
+  ${weightSummaryBatchSchema}
   ${dateFilterSchema}
   ${paginationSchema}
   ${sortSchema}

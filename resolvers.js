@@ -22,6 +22,7 @@ const orderTypeResolver = require('./modules/orderType/orderTypeResolver');
 const materialResolver = require('./modules/material/materialResolver');
 const materialOrderTypeResolver = require('./modules/materialOrderType/materialOrderTypeResolver');
 const elementValueResolver = require('./modules/elementValue/elementValueResolver');
+const weightSummaryBatchResolver = require('./modules/weightSummaryBatch/weightSummaryBatchResolver');
 
 module.exports = {
   DateTime: GraphQLDateTime,
@@ -48,6 +49,7 @@ module.exports = {
     ...scaleResolver.Query,
     ...scaleAssignmentResolver.Query,
     ...scaleResultsResolver.Query,
+    ...weightSummaryBatchResolver.Query,
   },
   Material: {
     ...materialResolver.Material,
@@ -71,5 +73,6 @@ module.exports = {
     ...scaleResolver.Mutation,
     ...scaleAssignmentResolver.Mutation,
     ...scaleResultsResolver.Mutation,
+    ...weightSummaryBatchResolver.Mutation,
   },
 };

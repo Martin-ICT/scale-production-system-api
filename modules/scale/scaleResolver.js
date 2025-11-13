@@ -56,9 +56,7 @@ const validationSchemas = {
     brand: Joi.string().required(),
     plantCode: Joi.string().optional(),
     uom: Joi.string().valid('KG', 'G').required(),
-    capacity: Joi.string()
-      .valid('_3KG', '_6KG', '_9KG', '_12KG', '_15KG')
-      .required(),
+    capacity: Joi.string().required(),
     lastCalibrate: Joi.date().optional(),
     status: Joi.string().valid('ACTIVE', 'INACTIVE').optional(),
   }),
@@ -70,7 +68,7 @@ const validationSchemas = {
     brand: Joi.string(),
     plantCode: Joi.string(),
     uom: Joi.string().valid('KG', 'G'),
-    capacity: Joi.string().valid('_3KG', '_6KG', '_9KG', '_12KG', '_15KG'),
+    capacity: Joi.string(),
     lastCalibrate: Joi.date(),
     status: Joi.string().valid('ACTIVE', 'INACTIVE'),
   }),
