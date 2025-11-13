@@ -14,6 +14,21 @@ const ScaleResults = require('../../models/scaleResults');
 const hasPermission = require('../../middlewares/hasPermission');
 const isAuthenticated = require('../../middlewares/isAuthenticated');
 
+// Ensure runtime association exists (in case model association registration wasn't invoked globally)
+try {
+  if (
+    !WeightSummaryBatch.associations ||
+    !WeightSummaryBatch.associations.productionOrderDetail
+  ) {
+    WeightSummaryBatch.belongsTo(ProductionOrderDetail, {
+      foreignKey: 'productionOrderDetailId',
+      as: 'productionOrderDetail',
+    });
+  }
+} catch (e) {
+  // no-op: if association already exists or registration fails, rely on global setup
+}
+
 // Mapping GraphQL ENUM <-> Database values
 const SEND_TO_SAP_MAP = {
   // GraphQL -> Database
