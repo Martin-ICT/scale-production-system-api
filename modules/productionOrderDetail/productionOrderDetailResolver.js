@@ -172,6 +172,41 @@ module.exports = {
             whereClause.orderTypeId = filter.orderTypeId;
           }
 
+          const productionOrderSAPWhere = {};
+          if (filter?.productionOrderNumber) {
+            productionOrderSAPWhere.productionOrderNumber =
+              filter.productionOrderNumber;
+          }
+          if (filter?.plantCode) {
+            productionOrderSAPWhere.plantCode = filter.plantCode;
+          }
+          if (filter?.date) {
+            const { startDate, endDate } = filter.date;
+            if (startDate && endDate) {
+              const fromDate = new Date(startDate);
+              fromDate.setHours(0, 0, 0, 0);
+              const toDate = new Date(endDate);
+              toDate.setHours(23, 59, 59, 999);
+              productionOrderSAPWhere.productionDate = {
+                [Sequelize.Op.between]: [fromDate, toDate],
+              };
+            } else if (startDate) {
+              const fromDate = new Date(startDate);
+              fromDate.setHours(0, 0, 0, 0);
+              productionOrderSAPWhere.productionDate = {
+                [Sequelize.Op.gte]: fromDate,
+              };
+            } else if (endDate) {
+              const toDate = new Date(endDate);
+              toDate.setHours(23, 59, 59, 999);
+              productionOrderSAPWhere.productionDate = {
+                [Sequelize.Op.lte]: toDate,
+              };
+            }
+          }
+          const hasProductionOrderSAPFilter =
+            Object.keys(productionOrderSAPWhere).length > 0;
+
           const productionOrderSAPInclude = {
             model: ProductionOrderSAP,
             as: 'productionOrderSAP',
@@ -187,14 +222,11 @@ module.exports = {
               'status',
               'createdAt',
             ],
-            required: !!filter?.productionOrderNumber,
+            required: hasProductionOrderSAPFilter,
+            ...(hasProductionOrderSAPFilter && {
+              where: productionOrderSAPWhere,
+            }),
           };
-
-          if (filter?.productionOrderNumber) {
-            productionOrderSAPInclude.where = {
-              productionOrderNumber: filter.productionOrderNumber,
-            };
-          }
 
           let includeOptions = [
             productionOrderSAPInclude,
@@ -252,13 +284,13 @@ module.exports = {
 
           const countInclude = [];
 
-          if (filter?.productionOrderNumber) {
+          if (hasProductionOrderSAPFilter) {
             countInclude.push({
               model: ProductionOrderSAP,
               as: 'productionOrderSAP',
               required: true,
               attributes: [],
-              where: { productionOrderNumber: filter.productionOrderNumber },
+              where: productionOrderSAPWhere,
             });
           }
 

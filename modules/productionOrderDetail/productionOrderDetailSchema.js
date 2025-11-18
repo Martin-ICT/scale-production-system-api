@@ -91,8 +91,10 @@ module.exports = gql`
     productionOrderId: Int
     productionOrderNumber: String
     materialCode: String
+    plantCode: String
     processingType: Int
     orderTypeId: Int
     scaleId: ID
+    date: DateFilter
   }
 `;
