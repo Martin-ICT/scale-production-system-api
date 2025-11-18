@@ -207,6 +207,11 @@ module.exports = {
                 as: 'productionOrderDetail',
                 required: false,
               },
+              {
+                model: WeightSummaryBatchItem,
+                as: 'WeightSummaryBatchItems',
+                required: false,
+              },
             ],
           });
 
@@ -246,6 +251,11 @@ module.exports = {
               {
                 model: ProductionOrderDetail,
                 as: 'productionOrderDetail',
+                required: false,
+              },
+              {
+                model: WeightSummaryBatchItem,
+                as: 'WeightSummaryBatchItems',
                 required: false,
               },
             ],

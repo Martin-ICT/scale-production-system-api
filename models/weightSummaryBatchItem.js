@@ -128,6 +128,11 @@ const WeightSummaryBatchItem = sequelize.define(
   }
 );
 
-WeightSummaryBatchItem.associate = (models) => {};
+WeightSummaryBatchItem.associate = (models) => {
+  WeightSummaryBatchItem.belongsTo(models.WeightSummaryBatch, {
+    foreignKey: 'weightSummaryBatchId',
+    as: 'weightSummaryBatch',
+  });
+};
 
 module.exports = WeightSummaryBatchItem;

@@ -59,11 +59,33 @@ module.exports = gql`
     batchId: String
     sendToSAP: WeightSummaryBatchSendToSAP
     productionOrderDetail: ProductionOrderDetail
+    WeightSummaryBatchItems: [WeightSummaryBatchItem]
     createdAt: DateTime!
     updatedAt: DateTime!
     deletedAt: DateTime
   }
 
+  type WeightSummaryBatchItem {
+    id: ID!
+    productionOrderNumber: String!
+    plantCode: String!
+    materialCode: String!
+    materialUom: String
+    totalWeight: Float
+    totalWeightConverted: Float
+    productionGroup: String
+    productionShift: Int
+    packingGroup: String
+    packingShift: Int
+    productionLot: String
+    productionLocation: String
+    storageLocation: String
+    weightSummaryBatchId: Int
+    packingDate: DateTime
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    deletedAt: DateTime
+  }
   type WeightSummaryBatchPagination {
     weightSummaryBatches: [WeightSummaryBatch]!
     meta: PaginationMeta!

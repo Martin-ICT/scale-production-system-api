@@ -30,7 +30,6 @@ module.exports = gql`
     targetWeight: Int!
     productionDate: DateTime!
     suitability: Int!
-    status: Int
   }
 
   type ProductionOrderSAP {

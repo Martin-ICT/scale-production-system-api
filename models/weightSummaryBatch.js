@@ -91,6 +91,10 @@ WeightSummaryBatch.associate = (models) => {
     foreignKey: 'productionOrderDetailId',
     as: 'productionOrderDetail',
   });
+  WeightSummaryBatch.hasMany(models.WeightSummaryBatchItem, {
+    foreignKey: 'weightSummaryBatchId',
+    as: 'WeightSummaryBatchItems',
+  });
 };
 
 module.exports = WeightSummaryBatch;

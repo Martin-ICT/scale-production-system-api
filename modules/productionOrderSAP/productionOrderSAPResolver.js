@@ -425,7 +425,7 @@ module.exports = {
             suitability: input.suitability,
             // optional/derived with safe defaults if not provided
             uom: input.uom ?? material?.uom?.code ?? 'KG',
-            status: input.status ?? 0,
+            status: input.status ?? 1,
           };
 
           const newProductionOrderSAP = await ProductionOrderSAP.create(
