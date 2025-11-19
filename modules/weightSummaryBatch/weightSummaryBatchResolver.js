@@ -97,11 +97,10 @@ const validationSchemas = {
       .valid('PENDING', 'PROCESSED', 'SENDING', 'FAILED', 'SUCCESS')
       .optional(),
   }),
-  weightSummaryBatchFromScaleResults: Joi.object({
-    productionOrderNumber: Joi.string().required(),
+  weightSummaryBatchUpdateStatus: Joi.object({
     sendToSAP: Joi.string()
       .valid('PENDING', 'PROCESSED', 'SENDING', 'FAILED', 'SUCCESS')
-      .optional(),
+      .required(),
   }),
 };
 
@@ -497,90 +496,43 @@ module.exports = {
 
     weightSummaryBatchCreateFromScaleResults: combineResolvers(
       isAuthenticated,
-      // hasPermission('weightSummaryBatch.create'),
-      async (_, { input }, { user }) => {
-        console.log('=== START weightSummaryBatchCreateFromScaleResults ===');
-        console.log('STEP 1: Input validation');
-        console.log('Input:', JSON.stringify(input, null, 2));
-
-        validateInput(
-          validationSchemas.weightSummaryBatchFromScaleResults,
-          input
-        );
-
-        console.log('STEP 2: Starting transaction');
+      async (_, __, { user }) => {
         const transaction = await WeightSummaryBatch.sequelize.transaction();
 
         try {
-          // Automatically get all scaleResults with isSummarized = false
-          // Filter by productionOrderNumber from input
-          console.log('STEP 3: Building where clause for scaleResults');
-          const whereClause = {
-            isSummarized: false,
-            productionOrderNumber: input.productionOrderNumber,
-          };
-          console.log('Where clause:', JSON.stringify(whereClause, null, 2));
-
-          // Fetch scale results
-          console.log('STEP 4: Fetching scaleResults from database');
           const scaleResults = await ScaleResults.findAll({
-            where: whereClause,
+            where: { isSummarized: false },
             order: [['id', 'ASC']],
             transaction,
           });
 
-          console.log(
-            `STEP 4 RESULT: Found ${scaleResults.length} scaleResults for productionOrderNumber: ${input.productionOrderNumber}`
-          );
-
-          if (scaleResults.length > 0) {
-            console.log(
-              'Sample scaleResult:',
-              JSON.stringify(scaleResults[0].toJSON(), null, 2)
-            );
-          }
-
           if (!scaleResults || scaleResults.length === 0) {
-            console.log('STEP 4 ERROR: No scaleResults found');
             throw new ApolloError(
-              `No scale results found with isSummarized=false for productionOrderNumber: ${input.productionOrderNumber}`,
+              'No scale results found with isSummarized=false',
               apolloErrorCodes.NOT_FOUND
             );
           }
 
           // Group scale results by all relevant fields
-          // All fields must match for results to be in the same group
-          // If any field differs, it becomes a new row
-          console.log('STEP 5: Grouping scaleResults by relevant fields');
+          const groupKeyFields = [
+            'productionOrderNumber',
+            'materialCode',
+            'productionGroup',
+            'productionShift',
+            'packingGroup',
+            'packingShift',
+            'productionLot',
+            'productionLocation',
+            'storageLocation',
+            'plantCode',
+          ];
+
           const groupedResults = {};
-          scaleResults.forEach((result, index) => {
+          scaleResults.forEach((result) => {
             const resultData = result.toJSON();
-            console.log(
-              `Processing scaleResult ${index + 1}/${
-                scaleResults.length
-              }, ID: ${resultData.id}`
-            );
-
-            // Create group key based on all relevant fields that must match
-            // These fields determine if results should be grouped together
-            const groupKeyFields = [
-              'productionOrderNumber',
-              'materialCode',
-              'productionGroup',
-              'productionShift',
-              'packingGroup',
-              'packingShift',
-              'productionLot',
-              'productionLocation',
-              'storageLocation',
-              'plantCode',
-            ];
-
-            // Build group key from all relevant fields
             const groupKey = groupKeyFields
               .map((field) => {
                 const value = resultData[field];
-                // Handle null/undefined values consistently
                 return `${field}:${
                   value !== null && value !== undefined ? value : 'null'
                 }`;
@@ -589,118 +541,35 @@ module.exports = {
 
             if (!groupedResults[groupKey]) {
               groupedResults[groupKey] = [];
-              console.log(
-                `  Created new group: ${groupKey.substring(0, 100)}...`
-              );
             }
             groupedResults[groupKey].push(resultData);
-            console.log(
-              `  Added to group. Group now has ${groupedResults[groupKey].length} items`
-            );
           });
 
-          console.log(
-            `STEP 5 RESULT: Grouped into ${
-              Object.keys(groupedResults).length
-            } groups`
-          );
-
-          Object.entries(groupedResults).forEach(([key, items], index) => {
-            console.log(
-              `  Group ${index + 1}: ${
-                items.length
-              } items, key: ${key.substring(0, 100)}...`
-            );
-          });
-
-          // Create WeightSummaryBatch and WeightSummaryBatchItem for each group
-          console.log('STEP 6: Processing each group to create batches');
           const createdBatches = [];
           const batchItemsToCreate = [];
-          const totalGroups = Object.keys(groupedResults).length;
-          const skippedGroups = [];
-          const skippedReasons = {};
+          const totalConvertedByPODId = {};
+          const totalWeightByPODId = {};
+          const batchMap = new Map();
+          const processedScaleResultIds = [];
 
           for (const [groupKey, groupResults] of Object.entries(
             groupedResults
           )) {
-            const groupIndex = createdBatches.length + 1;
-            console.log(
-              `\n--- Processing Group ${groupIndex}/${totalGroups} ---`
-            );
-            console.log(`Group key: ${groupKey.substring(0, 100)}...`);
+            if (groupResults.length === 0) continue;
 
-            if (groupResults.length === 0) {
-              console.log('  SKIP: Group has no results');
-              continue;
-            }
-
-            // Get representative values from first result in group
             const firstResult = groupResults[0];
             const materialCode = firstResult.materialCode;
-            const scaleResultProductionOrderNumber =
+            const searchProductionOrderNumber =
               firstResult.productionOrderNumber;
 
-            console.log(
-              `  STEP 6.${groupIndex}.1: First result materialCode: ${materialCode}`
-            );
-            console.log(
-              `  STEP 6.${groupIndex}.1: Group has ${groupResults.length} scaleResults`
-            );
-            console.log(
-              `  STEP 6.${groupIndex}.1: ScaleResult productionOrderNumber: ${scaleResultProductionOrderNumber}`
-            );
-            console.log(
-              `  STEP 6.${groupIndex}.1: Input productionOrderNumber: ${input.productionOrderNumber}`
-            );
-
-            // Find ProductionOrderDetail based on productionOrderNumber and materialCode
-            // productionOrderNumber is in ProductionOrderSAP, not ProductionOrderDetail directly
-            // Step 1: Find ProductionOrderSAP by productionOrderNumber
-            // Step 2: Find ProductionOrderDetail by productionOrderId and materialCode
-            console.log(
-              `  STEP 6.${groupIndex}.2: Finding ProductionOrderDetail...`
-            );
-            console.log(`    Searching for materialCode: ${materialCode}`);
-
-            const searchProductionOrderNumber =
-              scaleResultProductionOrderNumber || input.productionOrderNumber;
-            console.log(
-              `    Using productionOrderNumber: ${searchProductionOrderNumber}`
-            );
-
-            // Step 1: Find ProductionOrderSAP by productionOrderNumber
             const productionOrderSAP = await ProductionOrderSAP.findOne({
-              where: {
-                productionOrderNumber: searchProductionOrderNumber,
-              },
+              where: { productionOrderNumber: searchProductionOrderNumber },
               attributes: ['id', 'productionOrderNumber', 'plantCode'],
               transaction,
             });
 
-            if (!productionOrderSAP) {
-              console.log(
-                `  STEP 6.${groupIndex}.2 RESULT: ProductionOrderSAP NOT FOUND - Skipping group`
-              );
+            if (!productionOrderSAP) continue;
 
-              // Track skipped group
-              skippedGroups.push({
-                groupIndex,
-                materialCode,
-                productionOrderNumber: searchProductionOrderNumber,
-                scaleResultCount: groupResults.length,
-              });
-
-              skippedReasons[materialCode] = {
-                searchedFor: searchProductionOrderNumber,
-                found: [],
-                message: `ProductionOrderSAP with productionOrderNumber '${searchProductionOrderNumber}' does not exist`,
-              };
-
-              continue;
-            }
-
-            // Step 2: Find ProductionOrderDetail by productionOrderId and materialCode
             const productionOrderDetail = await ProductionOrderDetail.findOne({
               where: {
                 productionOrderId: productionOrderSAP.id,
@@ -717,301 +586,306 @@ module.exports = {
               transaction,
             });
 
-            if (!productionOrderDetail) {
-              // Skip this group if ProductionOrderDetail not found (no error, just skip)
-              console.log(
-                `  STEP 6.${groupIndex}.2 RESULT: ProductionOrderDetail NOT FOUND - Skipping group`
-              );
+            if (!productionOrderDetail) continue;
 
-              // Track skipped group
-              skippedGroups.push({
-                groupIndex,
-                materialCode,
-                productionOrderNumber: searchProductionOrderNumber,
-                productionOrderId: productionOrderSAP.id,
-                scaleResultCount: groupResults.length,
-              });
+            // Skip if batch with sendToSAP = "PROCESSED" already exists
+            const processedBatch = await WeightSummaryBatch.findOne({
+              where: {
+                productionOrderDetailId: productionOrderDetail.id,
+                sendToSAP: 'processed',
+              },
+              transaction,
+            });
 
-              skippedReasons[materialCode] = {
-                searchedFor: searchProductionOrderNumber,
-                found: [],
-                message: `ProductionOrderDetail not found for productionOrderId ${productionOrderSAP.id} and materialCode '${materialCode}'`,
-              };
+            if (processedBatch) continue;
 
-              continue;
-            }
-
-            console.log(
-              `  STEP 6.${groupIndex}.2 RESULT: Found ProductionOrderDetail`
-            );
-            console.log(
-              `    ProductionOrderDetail ID: ${productionOrderDetail.id}`
-            );
-            console.log(`    materialCode: ${materialCode}`);
-            console.log(
-              `    productionOrderSAP ID: ${productionOrderDetail.productionOrderSAP?.id}`
-            );
-            console.log(
-              `    plantCode: ${productionOrderDetail.productionOrderSAP?.plantCode}`
-            );
-
-            // Get plantCode for batchId generation
-            console.log(`  STEP 6.${groupIndex}.3: Getting plantCode`);
-            let plantCode =
+            const plantCode =
               productionOrderDetail.productionOrderSAP?.plantCode ||
               firstResult.plantCode ||
               user?.plantCode;
-            console.log(`    plantCode: ${plantCode}`);
 
-            // Calculate totals and find min/max IDs
-            console.log(`  STEP 6.${groupIndex}.4: Calculating totals and IDs`);
             const scaleResultIds = groupResults.map((r) => r.id);
             const scaleResultIdFrom = Math.min(...scaleResultIds);
             const scaleResultIdTo = Math.max(...scaleResultIds);
-            console.log(`    scaleResultIdFrom: ${scaleResultIdFrom}`);
-            console.log(`    scaleResultIdTo: ${scaleResultIdTo}`);
 
-            // Calculate totalWeight and totalWeightConverted
-            const totalWeight = groupResults.reduce(
-              (sum, r) => sum + (parseFloat(r.weight) || 0),
-              0
-            );
-            const totalWeightConverted = groupResults.reduce(
-              (sum, r) => sum + (parseFloat(r.weight_converted) || 0),
-              0
-            );
-            console.log(`    totalWeight: ${totalWeight}`);
-            console.log(`    totalWeightConverted: ${totalWeightConverted}`);
+            const totalWeight = groupResults.reduce((sum, r) => {
+              return sum + (parseFloat(r.weight) || 0);
+            }, 0);
 
-            // Create WeightSummaryBatch
-            console.log(
-              `  STEP 6.${groupIndex}.5: Creating WeightSummaryBatch payload`
-            );
-            const batchPayload = {
-              scaleResultIdFrom,
-              scaleResultIdTo,
-              productionOrderDetailId: productionOrderDetail.id,
-              createdBy: user?.userId || null,
-            };
+            const totalWeightConverted = groupResults.reduce((sum, r) => {
+              const weightConverted =
+                parseFloat(r.weight_converted || r.weightConverted || 0) || 0;
+              return sum + weightConverted;
+            }, 0);
 
-            // Generate batchId directly using the same logic as in the model
-            const pcForBatch = plantCode ?? '0000';
-            batchPayload.batchId = await generateBatchIdForPlant(
-              pcForBatch,
-              transaction
-            );
-            console.log(`    Generated batchId: ${batchPayload.batchId}`);
+            const batchKey = `${materialCode}|${searchProductionOrderNumber}|${productionOrderDetail.id}`;
+            let existingBatch = batchMap.get(batchKey);
 
-            // Convert GraphQL enum to database value if provided
-            if (input.sendToSAP) {
-              batchPayload.sendToSAP =
-                SEND_TO_SAP_MAP[input.sendToSAP] ||
-                input.sendToSAP.toLowerCase();
+            if (!existingBatch) {
+              const existingDbBatch = await WeightSummaryBatch.findOne({
+                where: {
+                  productionOrderDetailId: productionOrderDetail.id,
+                  sendToSAP: 'pending',
+                },
+                transaction,
+              });
+
+              if (existingDbBatch) {
+                existingBatch = existingDbBatch;
+                batchMap.set(batchKey, existingBatch);
+                if (!createdBatches.find((b) => b.id === existingBatch.id)) {
+                  createdBatches.push(existingBatch);
+                }
+                const newScaleResultIdTo = Math.max(
+                  existingBatch.scaleResultIdTo,
+                  scaleResultIdTo
+                );
+                if (newScaleResultIdTo !== existingBatch.scaleResultIdTo) {
+                  await existingBatch.update(
+                    { scaleResultIdTo: newScaleResultIdTo },
+                    { transaction }
+                  );
+                  existingBatch.scaleResultIdTo = newScaleResultIdTo;
+                }
+              } else {
+                const batchPayload = {
+                  scaleResultIdFrom,
+                  scaleResultIdTo,
+                  productionOrderDetailId: productionOrderDetail.id,
+                  sendToSAP: 'pending',
+                  createdBy: user?.userId || null,
+                  batchId: await generateBatchIdForPlant(
+                    plantCode ?? '0000',
+                    transaction
+                  ),
+                };
+
+                existingBatch = await WeightSummaryBatch.create(batchPayload, {
+                  transaction,
+                });
+
+                batchMap.set(batchKey, existingBatch);
+                createdBatches.push(existingBatch);
+              }
+            } else {
+              const newScaleResultIdTo = Math.max(
+                existingBatch.scaleResultIdTo,
+                scaleResultIdTo
+              );
+              if (newScaleResultIdTo !== existingBatch.scaleResultIdTo) {
+                await existingBatch.update(
+                  { scaleResultIdTo: newScaleResultIdTo },
+                  { transaction }
+                );
+                existingBatch.scaleResultIdTo = newScaleResultIdTo;
+              }
             }
 
-            console.log(
-              `  STEP 6.${groupIndex}.5: Batch payload:`,
-              JSON.stringify(batchPayload, null, 2)
-            );
+            let existingItem = null;
+            if (existingBatch.id) {
+              const existingItems = await WeightSummaryBatchItem.findAll({
+                where: {
+                  weightSummaryBatchId: existingBatch.id,
+                  productionGroup: firstResult.productionGroup || null,
+                  productionShift: firstResult.productionShift || null,
+                  packingGroup: firstResult.packingGroup || null,
+                  packingShift: firstResult.packingShift || null,
+                  productionLot: firstResult.productionLot || null,
+                  productionLocation: firstResult.productionLocation || null,
+                  storageLocation: firstResult.storageLocation || null,
+                },
+                transaction,
+              });
 
-            console.log(
-              `  STEP 6.${groupIndex}.6: Creating WeightSummaryBatch in database`
-            );
-            // Create with explicit batchId already set
-            const createOptions = { transaction };
-            const newBatch = await WeightSummaryBatch.create(
-              batchPayload,
-              createOptions
-            );
+              if (existingItems.length > 0) {
+                existingItem = existingItems[0];
+              }
+            }
 
-            console.log(
-              `  STEP 6.${groupIndex}.6 RESULT: Created WeightSummaryBatch`
-            );
-            console.log(`    ID: ${newBatch.id}`);
-            console.log(`    batchId: ${newBatch.batchId}`);
-            console.log(
-              `    Full batch:`,
-              JSON.stringify(newBatch.toJSON(), null, 2)
-            );
+            if (existingItem) {
+              const newTotalWeight =
+                (parseFloat(existingItem.totalWeight) || 0) + totalWeight;
+              const newTotalWeightConverted =
+                (parseFloat(existingItem.totalWeightConverted) || 0) +
+                totalWeightConverted;
 
-            // Create WeightSummaryBatchItem
-            console.log(
-              `  STEP 6.${groupIndex}.7: Creating WeightSummaryBatchItem payload`
-            );
-            const batchItemPayload = {
-              weightSummaryBatchId: newBatch.id,
-              productionOrderNumber: firstResult.productionOrderNumber || '',
-              plantCode: firstResult.plantCode || plantCode || '',
-              materialCode: firstResult.materialCode || '',
-              materialUom: firstResult.materialUom || null,
-              totalWeight: totalWeight,
-              totalWeightConverted: totalWeightConverted,
-              productionGroup: firstResult.productionGroup || null,
-              productionShift: firstResult.productionShift || null,
-              packingGroup: firstResult.packingGroup || null,
-              packingShift: firstResult.packingShift || null,
-              productionLot: firstResult.productionLot || null,
-              productionLocation: firstResult.productionLocation || null,
-              storageLocation: firstResult.storageLocation || null,
-              packingDate: firstResult.createdAt
-                ? new Date(firstResult.createdAt)
-                : null,
-              createdBy: user?.userId || null,
-            };
-
-            console.log(
-              `  STEP 6.${groupIndex}.7: BatchItem payload:`,
-              JSON.stringify(batchItemPayload, null, 2)
-            );
-
-            batchItemsToCreate.push(batchItemPayload);
-            createdBatches.push(newBatch);
-            console.log(
-              `  STEP 6.${groupIndex} COMPLETE: Added to batch creation queue\n`
-            );
-          }
-
-          // Bulk create batch items
-          console.log('\nSTEP 7: Bulk creating WeightSummaryBatchItems');
-          console.log(
-            `  Total batchItems to create: ${batchItemsToCreate.length}`
-          );
-
-          if (batchItemsToCreate.length > 0) {
-            console.log('  STEP 7.1: Executing bulkCreate...');
-            await WeightSummaryBatchItem.bulkCreate(batchItemsToCreate, {
-              transaction,
-            });
-            console.log(
-              `  STEP 7.1 RESULT: Created ${batchItemsToCreate.length} WeightSummaryBatchItems`
-            );
-          } else {
-            console.warn('  STEP 7 WARNING: No batch items to create');
-          }
-
-          // Keep isSummarized = false for testing (so data can be reused)
-          // In production, this should be set to true
-          console.log('\nSTEP 8: Skipping isSummarized update (for testing)');
-          // const allScaleResultIds = scaleResults.map((r) => r.id);
-          // if (allScaleResultIds.length > 0) {
-          //   await ScaleResults.update(
-          //     { isSummarized: true },
-          //     {
-          //       where: {
-          //         id: { [Sequelize.Op.in]: allScaleResultIds },
-          //       },
-          //       transaction,
-          //     }
-          //   );
-          // }
-
-          console.log('\nSTEP 9: Summary before commit');
-          console.log(`  Total groups processed: ${totalGroups}`);
-          console.log(
-            `  Successfully created: ${createdBatches.length} WeightSummaryBatch records`
-          );
-          console.log(`  Skipped groups: ${skippedGroups.length}`);
-          console.log(
-            `  Created ${batchItemsToCreate.length} WeightSummaryBatchItem records`
-          );
-
-          if (createdBatches.length === 0) {
-            console.log('STEP 9 ERROR: No batches were created');
-            console.log('\n=== DETAILED ERROR ANALYSIS ===');
-            console.log(`Total groups from scaleResults: ${totalGroups}`);
-            console.log(`Skipped groups: ${skippedGroups.length}`);
-
-            if (skippedGroups.length > 0) {
-              console.log('\nSkipped groups details:');
-              skippedGroups.forEach((skipped, idx) => {
-                console.log(`  ${idx + 1}. Group ${skipped.groupIndex}:`);
-                console.log(`     - materialCode: ${skipped.materialCode}`);
-                console.log(
-                  `     - productionOrderNumber: ${skipped.productionOrderNumber}`
-                );
-                console.log(
-                  `     - scaleResultCount: ${skipped.scaleResultCount}`
-                );
-                if (skippedReasons[skipped.materialCode]) {
-                  console.log(
-                    `     - Reason: ${
-                      skippedReasons[skipped.materialCode].message
-                    }`
-                  );
-                }
+              await existingItem.update(
+                {
+                  totalWeight: newTotalWeight,
+                  totalWeightConverted: newTotalWeightConverted,
+                  updatedBy: user?.userId || null,
+                },
+                { transaction }
+              );
+            } else {
+              batchItemsToCreate.push({
+                weightSummaryBatchId: existingBatch.id,
+                productionOrderNumber: firstResult.productionOrderNumber || '',
+                plantCode: firstResult.plantCode || plantCode || '',
+                materialCode: firstResult.materialCode || '',
+                materialUom: firstResult.materialUom || null,
+                totalWeight: totalWeight,
+                totalWeightConverted: totalWeightConverted,
+                productionGroup: firstResult.productionGroup || null,
+                productionShift: firstResult.productionShift || null,
+                packingGroup: firstResult.packingGroup || null,
+                packingShift: firstResult.packingShift || null,
+                productionLot: firstResult.productionLot || null,
+                productionLocation: firstResult.productionLocation || null,
+                storageLocation: firstResult.storageLocation || null,
+                packingDate: firstResult.createdAt
+                  ? new Date(firstResult.createdAt)
+                  : null,
+                createdBy: user?.userId || null,
               });
             }
 
-            // Get unique materialCodes from scaleResults
-            const uniqueMaterialCodes = [
-              ...new Set(
-                scaleResults.map((r) => r.toJSON().materialCode).filter(Boolean)
-              ),
-            ];
-            console.log(
-              `\nUnique materialCodes in scaleResults: ${uniqueMaterialCodes.join(
-                ', '
-              )}`
-            );
+            const podId = productionOrderDetail.id;
+            const addConverted = Number.isFinite(totalWeightConverted)
+              ? totalWeightConverted
+              : 0;
+            totalConvertedByPODId[podId] =
+              (totalConvertedByPODId[podId] || 0) + addConverted;
 
-            // Check which materialCodes exist in ProductionOrderDetail (simplified query)
-            const existingMaterialCodes = await ProductionOrderDetail.findAll({
-              attributes: ['materialCode'],
-              distinct: true,
-              col: 'materialCode',
-              raw: false,
+            // Track totalWeight per productionOrderDetailId
+            const addWeight = Number.isFinite(totalWeight) ? totalWeight : 0;
+            totalWeightByPODId[podId] =
+              (totalWeightByPODId[podId] || 0) + addWeight;
+
+            // Track scaleResult IDs that were processed
+            groupResults.forEach((result) => {
+              if (result.id) {
+                processedScaleResultIds.push(result.id);
+              }
+            });
+          }
+
+          if (batchItemsToCreate.length > 0) {
+            await WeightSummaryBatchItem.bulkCreate(batchItemsToCreate, {
               transaction,
             });
 
-            const existingMaterialCodeSet = new Set();
-            existingMaterialCodes.forEach((pod) => {
-              if (pod.materialCode) {
-                existingMaterialCodeSet.add(pod.materialCode);
+            const updates = Object.entries(totalConvertedByPODId).map(
+              async ([podId, addVal]) => {
+                return ProductionOrderDetail.increment('totalWeighed', {
+                  by: addVal,
+                  where: { id: Number(podId) },
+                  transaction,
+                });
               }
-            });
-
-            console.log(
-              `\nMaterialCodes that exist in ProductionOrderDetail: ${Array.from(
-                existingMaterialCodeSet
-              ).join(', ')}`
             );
 
-            const missingMaterialCodes = uniqueMaterialCodes.filter(
-              (mc) => !existingMaterialCodeSet.has(mc)
-            );
-            if (missingMaterialCodes.length > 0) {
-              console.log(
-                `\nMaterialCodes in scaleResults but NOT in ProductionOrderDetail: ${missingMaterialCodes.join(
-                  ', '
-                )}`
-              );
+            if (updates.length > 0) {
+              await Promise.all(updates);
             }
+          }
 
-            console.log('=== END ERROR ANALYSIS ===\n');
-
-            // Return empty array instead of throwing error (kalau ga ketemu ya sudah, skip saja)
+          if (createdBatches.length === 0) {
             await transaction.commit();
-            console.log(
-              'STEP 10 RESULT: Transaction committed (no batches created)'
-            );
             return [];
           }
 
-          console.log('\nSTEP 10: Committing transaction');
           await transaction.commit();
-          console.log('STEP 10 RESULT: Transaction committed successfully');
 
-          // Reload batches with associations (outside transaction since already committed)
-          console.log('\nSTEP 11: Reloading batches with associations');
+          // Update isSummarized = true for all processed scaleResults
+          if (processedScaleResultIds.length > 0) {
+            const uniqueScaleResultIds = [...new Set(processedScaleResultIds)];
+            await ScaleResults.update(
+              { isSummarized: true },
+              {
+                where: {
+                  id: { [Sequelize.Op.in]: uniqueScaleResultIds },
+                },
+              }
+            );
+          }
+
+          // Update totalWeighed and totalWeighedGoodReceive in ProductionOrderDetail
+          // totalWeighed: count all batches (all statuses)
+          // totalWeighedGoodReceive: count only batches with sendToSAP = "SENDING" or "SUCCESS"
+          const affectedPODIds = Object.keys(totalWeightByPODId).map(Number);
+          if (affectedPODIds.length > 0) {
+            for (const podId of affectedPODIds) {
+              // Get all batches for this productionOrderDetailId (for totalWeighed)
+              const allBatches = await WeightSummaryBatch.findAll({
+                where: { productionOrderDetailId: podId },
+                attributes: ['id', 'sendToSAP'],
+              });
+
+              // Get batches with sendToSAP = "sending" or "success" (for totalWeighedGoodReceive)
+              const goodReceiveBatches = allBatches.filter(
+                (b) => b.sendToSAP === 'sending' || b.sendToSAP === 'success'
+              );
+
+              // Calculate totalWeighed from all batches using totalWeightConverted
+              let totalWeighed = 0;
+              if (allBatches.length > 0) {
+                const allBatchIds = allBatches.map((b) => b.id);
+                const totalWeightResult = await WeightSummaryBatchItem.findAll({
+                  where: {
+                    weightSummaryBatchId: { [Sequelize.Op.in]: allBatchIds },
+                  },
+                  attributes: [
+                    [
+                      Sequelize.fn(
+                        'SUM',
+                        Sequelize.col('total_weight_converted')
+                      ),
+                      'totalWeight',
+                    ],
+                  ],
+                  raw: true,
+                });
+
+                totalWeighed = parseFloat(
+                  totalWeightResult[0]?.totalWeight || 0
+                );
+              }
+
+              // Calculate totalWeighedGoodReceive from SENDING and SUCCESS batches only using totalWeightConverted
+              let totalWeighedGoodReceive = 0;
+              if (goodReceiveBatches.length > 0) {
+                const goodReceiveBatchIds = goodReceiveBatches.map((b) => b.id);
+                const goodReceiveWeightResult =
+                  await WeightSummaryBatchItem.findAll({
+                    where: {
+                      weightSummaryBatchId: {
+                        [Sequelize.Op.in]: goodReceiveBatchIds,
+                      },
+                    },
+                    attributes: [
+                      [
+                        Sequelize.fn(
+                          'SUM',
+                          Sequelize.col('total_weight_converted')
+                        ),
+                        'totalWeight',
+                      ],
+                    ],
+                    raw: true,
+                  });
+
+                totalWeighedGoodReceive = parseFloat(
+                  goodReceiveWeightResult[0]?.totalWeight || 0
+                );
+              }
+
+              // Update ProductionOrderDetail
+              await ProductionOrderDetail.update(
+                {
+                  totalWeighed: totalWeighed,
+                  totalWeighedGoodReceive: totalWeighedGoodReceive,
+                },
+                { where: { id: podId } }
+              );
+            }
+          }
+
           const batchIds = createdBatches.map((b) => b.id);
-          console.log(`  Batch IDs to reload: ${JSON.stringify(batchIds)}`);
           let batchesData = [];
 
           if (batchIds.length > 0) {
             try {
-              console.log(
-                '  STEP 11.1: Fetching batches with ProductionOrderDetail...'
-              );
               const reloadedBatches = await WeightSummaryBatch.findAll({
                 where: {
                   id: { [Sequelize.Op.in]: batchIds },
@@ -1024,12 +898,6 @@ module.exports = {
                 ],
               });
 
-              console.log(
-                `  STEP 11.1 RESULT: Reloaded ${reloadedBatches.length} batches`
-              );
-
-              // Convert enum values from database to GraphQL enum format
-              console.log('  STEP 11.2: Converting enum values...');
               batchesData = reloadedBatches.map((batch) => {
                 const batchData = batch.toJSON();
                 if (batchData.sendToSAP != null) {
@@ -1040,19 +908,7 @@ module.exports = {
                 }
                 return batchData;
               });
-              console.log(
-                `  STEP 11.2 RESULT: Converted ${batchesData.length} batches`
-              );
             } catch (reloadError) {
-              // If reload fails, return the created batches without associations
-              console.error(
-                '  STEP 11 ERROR: Error reloading batches:',
-                reloadError
-              );
-              console.error('  Error stack:', reloadError.stack);
-              console.log(
-                '  STEP 11 FALLBACK: Using created batches without associations'
-              );
               batchesData = createdBatches.map((batch) => {
                 const batchData = batch.toJSON();
                 if (batchData.sendToSAP != null) {
@@ -1064,32 +920,146 @@ module.exports = {
                 return batchData;
               });
             }
-          } else {
-            console.log('  STEP 11 WARNING: No batch IDs to reload');
           }
-
-          console.log('\nSTEP 12: Final result');
-          console.log(`  Returning ${batchesData.length} batches`);
-          console.log('=== END weightSummaryBatchCreateFromScaleResults ===\n');
 
           return batchesData;
         } catch (err) {
-          console.error(
-            '\n=== ERROR in weightSummaryBatchCreateFromScaleResults ==='
-          );
-          console.error('Error message:', err.message);
-          console.error('Error stack:', err.stack);
-
-          // Only rollback if transaction hasn't been committed
           if (!transaction.finished) {
-            console.log('Rolling back transaction...');
             await transaction.rollback();
-            console.log('Transaction rolled back');
-          } else {
-            console.log('Transaction already committed, cannot rollback');
+          }
+          throw err;
+        }
+      }
+    ),
+
+    weightSummaryBatchUpdateStatus: combineResolvers(
+      isAuthenticated,
+      // hasPermission('weightSummaryBatch.update'),
+      async (_, { id, input }, { user }) => {
+        validateInput(validationSchemas.weightSummaryBatchUpdateStatus, input);
+        const transaction = await WeightSummaryBatch.sequelize.transaction();
+
+        try {
+          const weightSummaryBatch = await WeightSummaryBatch.findByPk(id, {
+            transaction,
+          });
+
+          if (!weightSummaryBatch) {
+            throw new ApolloError(
+              'Weight Summary Batch not found',
+              apolloErrorCodes.NOT_FOUND
+            );
           }
 
-          console.error('=== END ERROR ===\n');
+          // Prepare update payload - only update sendToSAP status
+          const updatePayload = {
+            updatedBy: user?.userId || null,
+            sendToSAP:
+              SEND_TO_SAP_MAP[input.sendToSAP] || input.sendToSAP.toLowerCase(),
+          };
+
+          await weightSummaryBatch.update(updatePayload, { transaction });
+
+          await transaction.commit();
+
+          // Update ProductionOrderDetail.totalWeighed and totalWeighedGoodReceive
+          // after status update
+          const productionOrderDetailId =
+            weightSummaryBatch.productionOrderDetailId;
+          if (productionOrderDetailId) {
+            // Get all batches for this productionOrderDetailId (for totalWeighed)
+            const allBatches = await WeightSummaryBatch.findAll({
+              where: { productionOrderDetailId: productionOrderDetailId },
+              attributes: ['id', 'sendToSAP'],
+            });
+
+            // Get batches with sendToSAP = "sending" or "success" (for totalWeighedGoodReceive)
+            const goodReceiveBatches = allBatches.filter(
+              (b) => b.sendToSAP === 'sending' || b.sendToSAP === 'success'
+            );
+
+            // Calculate totalWeighed from all batches using totalWeightConverted
+            let totalWeighed = 0;
+            if (allBatches.length > 0) {
+              const allBatchIds = allBatches.map((b) => b.id);
+              const totalWeightResult = await WeightSummaryBatchItem.findAll({
+                where: {
+                  weightSummaryBatchId: { [Sequelize.Op.in]: allBatchIds },
+                },
+                attributes: [
+                  [
+                    Sequelize.fn(
+                      'SUM',
+                      Sequelize.col('total_weight_converted')
+                    ),
+                    'totalWeight',
+                  ],
+                ],
+                raw: true,
+              });
+
+              totalWeighed = parseFloat(totalWeightResult[0]?.totalWeight || 0);
+            }
+
+            // Calculate totalWeighedGoodReceive from SENDING and SUCCESS batches only using totalWeightConverted
+            let totalWeighedGoodReceive = 0;
+            if (goodReceiveBatches.length > 0) {
+              const goodReceiveBatchIds = goodReceiveBatches.map((b) => b.id);
+              const goodReceiveWeightResult =
+                await WeightSummaryBatchItem.findAll({
+                  where: {
+                    weightSummaryBatchId: {
+                      [Sequelize.Op.in]: goodReceiveBatchIds,
+                    },
+                  },
+                  attributes: [
+                    [
+                      Sequelize.fn(
+                        'SUM',
+                        Sequelize.col('total_weight_converted')
+                      ),
+                      'totalWeight',
+                    ],
+                  ],
+                  raw: true,
+                });
+
+              totalWeighedGoodReceive = parseFloat(
+                goodReceiveWeightResult[0]?.totalWeight || 0
+              );
+            }
+
+            // Update ProductionOrderDetail
+            await ProductionOrderDetail.update(
+              {
+                totalWeighed: totalWeighed,
+                totalWeighedGoodReceive: totalWeighedGoodReceive,
+              },
+              { where: { id: productionOrderDetailId } }
+            );
+          }
+
+          // Reload with associations
+          await weightSummaryBatch.reload({
+            include: [
+              {
+                model: ProductionOrderDetail,
+                as: 'productionOrderDetail',
+              },
+            ],
+          });
+
+          // Convert enum values from database to GraphQL enum format
+          const batchData = weightSummaryBatch.toJSON();
+          if (batchData.sendToSAP != null) {
+            batchData.sendToSAP =
+              SEND_TO_SAP_MAP[String(batchData.sendToSAP).toLowerCase()] ||
+              batchData.sendToSAP.toUpperCase();
+          }
+
+          return batchData;
+        } catch (err) {
+          await transaction.rollback();
           throw err;
         }
       }

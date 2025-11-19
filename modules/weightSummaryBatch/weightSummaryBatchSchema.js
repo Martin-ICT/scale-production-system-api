@@ -20,10 +20,12 @@ module.exports = gql`
       id: ID!
       input: WeightSummaryBatchInputUpdate!
     ): WeightSummaryBatch
+    weightSummaryBatchUpdateStatus(
+      id: ID!
+      input: WeightSummaryBatchInputUpdateStatus!
+    ): WeightSummaryBatch
     weightSummaryBatchDelete(id: ID!): Boolean
-    weightSummaryBatchCreateFromScaleResults(
-      input: WeightSummaryBatchFromScaleResultsInput!
-    ): [WeightSummaryBatch!]!
+    weightSummaryBatchCreateFromScaleResults: [WeightSummaryBatch!]!
   }
 
   enum WeightSummaryBatchSendToSAP {
@@ -48,6 +50,10 @@ module.exports = gql`
     scaleResultIdTo: Int
     productionOrderDetailId: Int
     batchId: String
+    sendToSAP: WeightSummaryBatchSendToSAP
+  }
+
+  input WeightSummaryBatchInputUpdateStatus {
     sendToSAP: WeightSummaryBatchSendToSAP
   }
 
@@ -98,10 +104,5 @@ module.exports = gql`
     batchId: String
     sendToSAP: WeightSummaryBatchSendToSAP
     date: DateFilter
-  }
-
-  input WeightSummaryBatchFromScaleResultsInput {
-    productionOrderNumber: String!
-    sendToSAP: WeightSummaryBatchSendToSAP
   }
 `;

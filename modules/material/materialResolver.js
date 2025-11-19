@@ -75,6 +75,9 @@ module.exports = {
           if (filter?.uomId) {
             whereClause.uomId = filter.uomId;
           }
+          if (filter?.id) {
+            whereClause.id = filter.id;
+          }
 
           // Handle orderTypeId filter
           let includeClause = [
@@ -209,6 +212,9 @@ module.exports = {
 
           if (filter?.uomId) {
             whereClause.uomId = filter.uomId;
+          }
+          if (filter?.id) {
+            whereClause.id = filter.id;
           }
 
           // Handle orderTypeCode filter for count
