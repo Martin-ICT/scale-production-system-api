@@ -64,6 +64,7 @@ module.exports = gql`
     productionOrderDetailId: Int
     batchId: String
     sendToSAP: WeightSummaryBatchSendToSAP
+    productionOrderNumber: String
     productionOrderDetail: ProductionOrderDetail
     WeightSummaryBatchItems: [WeightSummaryBatchItem]
     createdAt: DateTime!
@@ -102,7 +103,7 @@ module.exports = gql`
     scaleResultIdTo: Int
     productionOrderDetailId: Int
     batchId: String
-    sendToSAP: WeightSummaryBatchSendToSAP
+    sendToSAP: [WeightSummaryBatchSendToSAP]
     date: DateFilter
   }
 `;

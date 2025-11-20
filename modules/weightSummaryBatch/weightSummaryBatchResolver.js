@@ -157,10 +157,22 @@ module.exports = {
           }
 
           if (filter?.sendToSAP) {
-            // Convert GraphQL enum to database value
-            whereClause.sendToSAP =
-              SEND_TO_SAP_MAP[filter.sendToSAP] ||
-              filter.sendToSAP.toLowerCase();
+            if (
+              Array.isArray(filter.sendToSAP) &&
+              filter.sendToSAP.length > 0
+            ) {
+              // Convert array of GraphQL enums to database values
+              whereClause.sendToSAP = {
+                [Sequelize.Op.in]: filter.sendToSAP.map(
+                  (status) => SEND_TO_SAP_MAP[status] || status.toLowerCase()
+                ),
+              };
+            } else if (!Array.isArray(filter.sendToSAP)) {
+              // Single value (backward compatibility)
+              whereClause.sendToSAP =
+                SEND_TO_SAP_MAP[filter.sendToSAP] ||
+                filter.sendToSAP.toLowerCase();
+            }
           }
 
           // Handle date range filter using DateFilter
@@ -205,6 +217,13 @@ module.exports = {
                 model: ProductionOrderDetail,
                 as: 'productionOrderDetail',
                 required: false,
+                include: [
+                  {
+                    model: ProductionOrderSAP,
+                    as: 'productionOrderSAP',
+                    required: false,
+                  },
+                ],
               },
               {
                 model: WeightSummaryBatchItem,
@@ -221,6 +240,14 @@ module.exports = {
               batchData.sendToSAP =
                 SEND_TO_SAP_MAP[String(batchData.sendToSAP).toLowerCase()] ||
                 batchData.sendToSAP.toUpperCase();
+            }
+            // Add productionOrderNumber from nested productionOrderSAP
+            if (
+              batchData.productionOrderDetail?.productionOrderSAP
+                ?.productionOrderNumber
+            ) {
+              batchData.productionOrderNumber =
+                batchData.productionOrderDetail.productionOrderSAP.productionOrderNumber;
             }
             return batchData;
           });
@@ -251,6 +278,13 @@ module.exports = {
                 model: ProductionOrderDetail,
                 as: 'productionOrderDetail',
                 required: false,
+                include: [
+                  {
+                    model: ProductionOrderSAP,
+                    as: 'productionOrderSAP',
+                    required: false,
+                  },
+                ],
               },
               {
                 model: WeightSummaryBatchItem,
@@ -273,6 +307,14 @@ module.exports = {
             batchData.sendToSAP =
               SEND_TO_SAP_MAP[String(batchData.sendToSAP).toLowerCase()] ||
               batchData.sendToSAP.toUpperCase();
+          }
+          // Add productionOrderNumber from nested productionOrderSAP
+          if (
+            batchData.productionOrderDetail?.productionOrderSAP
+              ?.productionOrderNumber
+          ) {
+            batchData.productionOrderNumber =
+              batchData.productionOrderDetail.productionOrderSAP.productionOrderNumber;
           }
 
           return batchData;
@@ -549,6 +591,7 @@ module.exports = {
           const batchItemsToCreate = [];
           const totalConvertedByPODId = {};
           const totalWeightByPODId = {};
+          const weighingCountByPODId = {};
           const batchMap = new Map();
           const processedScaleResultIds = [];
 
@@ -586,7 +629,9 @@ module.exports = {
               transaction,
             });
 
-            if (!productionOrderDetail) continue;
+            if (!productionOrderDetail) {
+              continue;
+            }
 
             // Skip if batch with sendToSAP = "PROCESSED" already exists
             const processedBatch = await WeightSummaryBatch.findOne({
@@ -597,7 +642,11 @@ module.exports = {
               transaction,
             });
 
-            if (processedBatch) continue;
+            console.log('MASUK GILA 1');
+
+            if (processedBatch) {
+              continue;
+            }
 
             const plantCode =
               productionOrderDetail.productionOrderSAP?.plantCode ||
@@ -622,6 +671,7 @@ module.exports = {
             let existingBatch = batchMap.get(batchKey);
 
             if (!existingBatch) {
+              console.log('MASUK GILA 1');
               const existingDbBatch = await WeightSummaryBatch.findOne({
                 where: {
                   productionOrderDetailId: productionOrderDetail.id,
@@ -648,6 +698,7 @@ module.exports = {
                   existingBatch.scaleResultIdTo = newScaleResultIdTo;
                 }
               } else {
+                console.log('MASUK GILA');
                 const batchPayload = {
                   scaleResultIdFrom,
                   scaleResultIdTo,
@@ -751,6 +802,11 @@ module.exports = {
             const addWeight = Number.isFinite(totalWeight) ? totalWeight : 0;
             totalWeightByPODId[podId] =
               (totalWeightByPODId[podId] || 0) + addWeight;
+
+            // Track weighingCount per productionOrderDetailId (count of scale results)
+            const scaleResultCount = groupResults.length;
+            weighingCountByPODId[podId] =
+              (weighingCountByPODId[podId] || 0) + scaleResultCount;
 
             // Track scaleResult IDs that were processed
             groupResults.forEach((result) => {
@@ -871,13 +927,22 @@ module.exports = {
               }
 
               // Update ProductionOrderDetail
-              await ProductionOrderDetail.update(
-                {
-                  totalWeighed: totalWeighed,
-                  totalWeighedGoodReceive: totalWeighedGoodReceive,
-                },
-                { where: { id: podId } }
-              );
+              const updatePayload = {
+                totalWeighed: totalWeighed,
+                totalWeighedGoodReceive: totalWeighedGoodReceive,
+              };
+
+              // Increment weighingCount if there are scale results processed
+              if (weighingCountByPODId[podId]) {
+                await ProductionOrderDetail.increment('weighingCount', {
+                  by: weighingCountByPODId[podId],
+                  where: { id: podId },
+                });
+              }
+
+              await ProductionOrderDetail.update(updatePayload, {
+                where: { id: podId },
+              });
             }
           }
 
