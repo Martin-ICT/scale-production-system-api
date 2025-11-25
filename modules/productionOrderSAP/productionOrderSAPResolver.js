@@ -421,6 +421,100 @@ module.exports = {
             );
           }
 
+          // If not exists, create new record
+          const payload = {
+            productionOrderNumber: input.productionOrderNumber,
+            plantCode: input.plantCode,
+            orderTypeCode: input.orderTypeCode,
+            materialCode: input.materialCode,
+            targetWeight: input.targetWeight,
+            productionDate: input.productionDate,
+            suitability: input.suitability,
+            // optional/derived with safe defaults if not provided
+            uom: input.uom ?? material?.uom?.code ?? 'KG',
+            status: input.status ?? 1,
+          };
+
+          const newProductionOrderSAP = await ProductionOrderSAP.create(
+            payload,
+            {
+              transaction,
+            }
+          );
+
+          await transaction.commit();
+          return newProductionOrderSAP;
+        } catch (err) {
+          await transaction.rollback();
+          throw err;
+        }
+      }
+    ),
+
+    productionOrderSAPCreateAndUpdate: combineResolvers(
+      // hasPermission('productionOrderSAP.create'),
+      async (_, { input }, { user }) => {
+        validateInput(validationSchemas.productionOrderSAPCreate, input);
+        const transaction = await ProductionOrderSAP.sequelize.transaction();
+
+        try {
+          // Fetch material from WMS by material code to derive UOM (and validate existence)
+          const material = await Material.findOne({
+            where: {
+              code: input.materialCode,
+              clientId: 1000009,
+            },
+            include: [
+              {
+                model: MaterialUom,
+                as: 'uom',
+                attributes: ['code'],
+                where: { clientId: 1000009 },
+                required: false,
+              },
+            ],
+          });
+
+          if (!material) {
+            throw new ApolloError(
+              'Material not found in WMS for provided materialCode',
+              apolloErrorCodes.BAD_DATA_VALIDATION
+            );
+          }
+
+          const existingProductionOrderSAP = await ProductionOrderSAP.findOne({
+            where: {
+              productionOrderNumber: input.productionOrderNumber,
+              materialCode: input.materialCode,
+            },
+          });
+
+          // If exists, update only allowed fields
+          if (existingProductionOrderSAP) {
+            const updatePayload = {};
+
+            if (input.targetWeight !== undefined) {
+              updatePayload.targetWeight = input.targetWeight;
+            }
+            if (input.productionDate !== undefined) {
+              updatePayload.productionDate = input.productionDate;
+            }
+            if (input.suitability !== undefined) {
+              updatePayload.suitability = input.suitability;
+            }
+            if (input.status !== undefined) {
+              updatePayload.status = input.status;
+            }
+
+            await existingProductionOrderSAP.update(updatePayload, {
+              transaction,
+            });
+
+            await transaction.commit();
+            return existingProductionOrderSAP;
+          }
+
+          // If not exists, create new record
           const payload = {
             productionOrderNumber: input.productionOrderNumber,
             plantCode: input.plantCode,

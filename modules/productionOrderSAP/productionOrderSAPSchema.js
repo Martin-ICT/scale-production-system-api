@@ -16,6 +16,9 @@ module.exports = gql`
     productionOrderSAPCreate(
       input: ProductionOrderSAPInputCreate!
     ): ProductionOrderSAP
+    productionOrderSAPCreateAndUpdate(
+      input: ProductionOrderSAPInputCreate!
+    ): ProductionOrderSAP
     productionOrderSAPUpdate(
       id: ID!
       input: ProductionOrderSAPInputUpdate!
