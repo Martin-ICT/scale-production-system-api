@@ -24,6 +24,12 @@ const validationSchemas = {
     materialCode: Joi.string().required(),
     targetWeight: Joi.number().integer().required().min(1),
   }),
+  productionOrderSAPUpdate: Joi.object({
+    targetWeight: Joi.number().integer().optional().min(1),
+    productionDate: Joi.date().optional(),
+    suitability: Joi.number().integer().optional(),
+    status: Joi.number().integer().optional().min(0),
+  }),
   productionOrderSAPUpdateStatus: Joi.object({
     id: Joi.number().integer().required(),
     status: Joi.number().integer().required().min(0),
@@ -437,6 +443,54 @@ module.exports = {
 
           await transaction.commit();
           return newProductionOrderSAP;
+        } catch (err) {
+          await transaction.rollback();
+          throw err;
+        }
+      }
+    ),
+
+    productionOrderSAPUpdate: combineResolvers(
+      // hasPermission('productionOrderSAP.update'),
+      async (_, { id, input }, { user }) => {
+        validateInput(validationSchemas.productionOrderSAPUpdate, input);
+        const transaction = await ProductionOrderSAP.sequelize.transaction();
+
+        try {
+          // Find existing production order
+          const existingProductionOrderSAP = await ProductionOrderSAP.findByPk(
+            id
+          );
+
+          if (!existingProductionOrderSAP) {
+            throw new ApolloError(
+              'ProductionOrderSAP not found',
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          // Build update payload with only provided fields
+          const payload = {};
+
+          if (input.targetWeight !== undefined) {
+            payload.targetWeight = input.targetWeight;
+          }
+          if (input.productionDate !== undefined) {
+            payload.productionDate = input.productionDate;
+          }
+          if (input.suitability !== undefined) {
+            payload.suitability = input.suitability;
+          }
+          if (input.status !== undefined) {
+            payload.status = input.status;
+          }
+
+          await existingProductionOrderSAP.update(payload, {
+            transaction,
+          });
+
+          await transaction.commit();
+          return existingProductionOrderSAP;
         } catch (err) {
           await transaction.rollback();
           throw err;

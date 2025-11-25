@@ -16,6 +16,10 @@ module.exports = gql`
     productionOrderSAPCreate(
       input: ProductionOrderSAPInputCreate!
     ): ProductionOrderSAP
+    productionOrderSAPUpdate(
+      id: ID!
+      input: ProductionOrderSAPInputUpdate!
+    ): ProductionOrderSAP
     productionOrderSAPUpdateStatus(
       productionOrderNumber: String!
       status: Int!
@@ -30,6 +34,13 @@ module.exports = gql`
     targetWeight: Int!
     productionDate: DateTime!
     suitability: Int!
+  }
+
+  input ProductionOrderSAPInputUpdate {
+    targetWeight: Int
+    productionDate: DateTime
+    suitability: Int
+    status: Int
   }
 
   type ProductionOrderSAP {
