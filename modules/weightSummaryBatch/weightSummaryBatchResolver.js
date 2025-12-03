@@ -566,6 +566,7 @@ module.exports = {
             'productionLot',
             'productionLocation',
             'storageLocation',
+            'storageLocationTarget',
             'plantCode',
           ];
 
@@ -744,6 +745,8 @@ module.exports = {
                   productionLot: firstResult.productionLot || null,
                   productionLocation: firstResult.productionLocation || null,
                   storageLocation: firstResult.storageLocation || null,
+                  storageLocationTarget:
+                    firstResult.storageLocationTarget || null,
                 },
                 transaction,
               });
@@ -784,6 +787,8 @@ module.exports = {
                 productionLot: firstResult.productionLot || null,
                 productionLocation: firstResult.productionLocation || null,
                 storageLocation: firstResult.storageLocation || null,
+                storageLocationTarget:
+                  firstResult.storageLocationTarget || null,
                 packingDate: firstResult.createdAt
                   ? new Date(firstResult.createdAt)
                   : null,

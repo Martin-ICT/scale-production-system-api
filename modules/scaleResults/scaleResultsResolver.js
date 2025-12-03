@@ -27,6 +27,7 @@ const validationSchemas = {
     productionLot: Joi.string().max(10).optional().allow(null, ''),
     productionLocation: Joi.string().max(10).optional().allow(null, ''),
     storageLocation: Joi.string().max(10).optional().allow(null, ''),
+    storageLocationTarget: Joi.string().max(10).optional().allow(null, ''),
     scaleTransactionId: Joi.string().max(30).optional().allow(null, ''),
     transactionType: Joi.string()
       .max(2)
@@ -57,6 +58,10 @@ const validationSchemas = {
           productionLot: Joi.string().max(10).optional().allow(null, ''),
           productionLocation: Joi.string().max(10).optional().allow(null, ''),
           storageLocation: Joi.string().max(10).optional().allow(null, ''),
+          storageLocationTarget: Joi.string()
+            .max(10)
+            .optional()
+            .allow(null, ''),
           scaleTransactionId: Joi.string().max(30).optional().allow(null, ''),
           transactionType: Joi.string()
             .max(2)
@@ -84,6 +89,7 @@ const validationSchemas = {
     productionLot: Joi.string().max(10).optional().allow(null, ''),
     productionLocation: Joi.string().max(10).optional().allow(null, ''),
     storageLocation: Joi.string().max(10).optional().allow(null, ''),
+    storageLocationTarget: Joi.string().max(10).optional().allow(null, ''),
     transactionType: Joi.string()
       .max(2)
       .valid('GI', 'GR')
@@ -170,6 +176,9 @@ module.exports = {
           }
           if (filter?.storageLocation) {
             whereClause.storageLocation = filter.storageLocation;
+          }
+          if (filter?.storageLocationTarget) {
+            whereClause.storageLocationTarget = filter.storageLocationTarget;
           }
           if (filter?.scaleTransactionId) {
             whereClause.scaleTransactionId = filter.scaleTransactionId;
@@ -324,6 +333,7 @@ module.exports = {
             userId: user?.userId || null,
             username: user?.name || null,
             storageLocation: input.storageLocation,
+            storageLocationTarget: input.storageLocationTarget,
             scaleTransactionId: input.scaleTransactionId,
             transactionType: input.transactionType,
             isSummarized: input.isSummarized ?? false,
@@ -407,6 +417,7 @@ module.exports = {
               userId: user?.userId || null,
               username: user?.name || null,
               storageLocation: item.storageLocation,
+              storageLocationTarget: item.storageLocationTarget,
               scaleTransactionId: item.scaleTransactionId, // If provided, will not be overridden by hook
               transactionType: item.transactionType,
               isSummarized: item.isSummarized ?? false,

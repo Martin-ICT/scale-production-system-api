@@ -79,6 +79,11 @@ const WeightSummaryBatchItem = sequelize.define(
       type: DataTypes.STRING(4),
       allowNull: true,
     },
+    storageLocationTarget: {
+      field: 'storage_location_target',
+      type: DataTypes.STRING(4),
+      allowNull: true,
+    },
     weightSummaryBatchId: {
       field: 'weight_summary_batch_id',
       type: DataTypes.INTEGER,

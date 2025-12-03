@@ -102,6 +102,11 @@ const ScaleResults = sequelize.define(
       type: DataTypes.STRING(10),
       allowNull: true,
     },
+    storageLocationTarget: {
+      field: 'storage_location_target',
+      type: DataTypes.STRING(10),
+      allowNull: true,
+    },
     transactionType: {
       field: 'transaction_type',
       type: DataTypes.STRING(2),

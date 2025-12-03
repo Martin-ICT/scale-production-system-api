@@ -87,6 +87,7 @@ module.exports = gql`
     productionLot: String
     productionLocation: String
     storageLocation: String
+    storageLocationTarget: String
     weightSummaryBatchId: Int
     packingDate: DateTime
     createdAt: DateTime!

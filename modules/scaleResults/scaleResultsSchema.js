@@ -43,6 +43,7 @@ module.exports = gql`
     productionLot: String
     productionLocation: String
     storageLocation: String
+    storageLocationTarget: String
     scaleTransactionId: String
     transactionType: String
     isSummarized: Boolean
@@ -67,6 +68,7 @@ module.exports = gql`
     productionLot: String
     productionLocation: String
     storageLocation: String
+    storageLocationTarget: String
     transactionType: String
     isSummarized: Boolean
   }
@@ -91,6 +93,7 @@ module.exports = gql`
     userId: Int
     username: String
     storageLocation: String
+    storageLocationTarget: String
     transactionType: String
     isSummarized: Boolean!
     createdAt: DateTime!
@@ -111,6 +114,7 @@ module.exports = gql`
     userId: Int
     username: String
     storageLocation: String
+    storageLocationTarget: String
     scaleTransactionId: String
     transactionType: String
     isSummarized: Boolean
