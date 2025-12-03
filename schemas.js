@@ -10,6 +10,7 @@ const productionLotSchema = require('./modules/productionLot/productionLotSchema
 const productionGroupSchema = require('./modules/productionGroup/productionGroupSchema');
 const productionShiftSchema = require('./modules/productionShift/productionShiftSchema');
 const storageLocationSchema = require('./modules/storageLocation/storageLocationSchema');
+const storageLocationTargetSchema = require('./modules/storageLocationTarget/storageLocationTargetSchema');
 const orderTypeSchema = require('./modules/orderType/orderTypeSchema');
 const materialSchema = require('./modules/material/materialSchema');
 const materialOrderTypeSchema = require('./modules/materialOrderType/materialOrderTypeSchema');
@@ -46,6 +47,7 @@ module.exports = gql`
   ${productionGroupSchema}
   ${productionShiftSchema}
   ${storageLocationSchema}
+  ${storageLocationTargetSchema}
   ${orderTypeSchema}
   ${materialSchema}
   ${materialOrderTypeSchema}

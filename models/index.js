@@ -12,6 +12,7 @@ const Scale = require('./scale');
 const ScaleAssignment = require('./scaleAssignment');
 const ScaleResults = require('./scaleResults');
 const StorageLocation = require('./storageLocation');
+const StorageLocationTarget = require('./storageLocationTarget');
 const WeightSummaryBatch = require('./weightSummaryBatch');
 const WeightSummaryBatchItem = require('./weightSummaryBatchItem');
 // const ProductionPlanning = require('./productionPlanning');
@@ -31,6 +32,7 @@ const models = {
   ScaleAssignment,
   ScaleResults,
   StorageLocation,
+  StorageLocationTarget,
   WeightSummaryBatch,
   WeightSummaryBatchItem,
 };

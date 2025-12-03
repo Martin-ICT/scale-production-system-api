@@ -18,6 +18,7 @@ const productionLotResolver = require('./modules/productionLot/productionLotReso
 const productionGroupResolver = require('./modules/productionGroup/productionGroupResolver');
 const productionShiftResolver = require('./modules/productionShift/productionShiftResolver');
 const storageLocationResolver = require('./modules/storageLocation/storageLocationResolver');
+const storageLocationTargetResolver = require('./modules/storageLocationTarget/storageLocationTargetResolver');
 const orderTypeResolver = require('./modules/orderType/orderTypeResolver');
 const materialResolver = require('./modules/material/materialResolver');
 const materialOrderTypeResolver = require('./modules/materialOrderType/materialOrderTypeResolver');
@@ -43,6 +44,7 @@ module.exports = {
     ...productionGroupResolver.Query,
     ...productionShiftResolver.Query,
     ...storageLocationResolver.Query,
+    ...storageLocationTargetResolver.Query,
     ...orderTypeResolver.Query,
     ...materialResolver.Query,
     ...materialOrderTypeResolver.Query,
@@ -71,6 +73,7 @@ module.exports = {
     ...productionGroupResolver.Mutation,
     ...productionShiftResolver.Mutation,
     ...storageLocationResolver.Mutation,
+    ...storageLocationTargetResolver.Mutation,
     ...orderTypeResolver.Mutation,
     ...scaleResolver.Mutation,
     ...scaleAssignmentResolver.Mutation,
