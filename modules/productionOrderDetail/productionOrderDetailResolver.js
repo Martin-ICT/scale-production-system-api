@@ -11,6 +11,7 @@ const ProductionOrderSAP = require('../../models/productionOrderSAP');
 const OrderType = require('../../models/orderType');
 const Material = require('../../models/material');
 const MaterialUom = require('../../models/materialUom');
+const MaterialOrderType = require('../../models/materialOrderType');
 const ScaleAssignment = require('../../models/scaleAssignment');
 const Scale = require('../../models/scale');
 const hasPermission = require('../../middlewares/hasPermission');
@@ -71,11 +72,46 @@ const attachMaterialToDetails = async (details) => {
         required: false,
         attributes: ['id', 'clientId', 'code', 'name'],
       },
+      {
+        model: MaterialOrderType,
+        as: 'materialOrderTypes',
+        required: false,
+        attributes: ['id', 'minWeight', 'maxWeight'],
+        where: {
+          clientId: MATERIAL_CLIENT_ID,
+        },
+      },
     ],
   });
 
   const materialMap = materials.reduce((acc, material) => {
-    acc[material.code] = material.toJSON();
+    const materialData = material.toJSON();
+
+    // Extract minWeight and maxWeight from materialOrderTypes
+    if (
+      materialData.materialOrderTypes &&
+      materialData.materialOrderTypes.length > 0
+    ) {
+      // Get minWeight from first MaterialOrderType that has minWeight
+      const firstWithMinWeight = materialData.materialOrderTypes.find(
+        (mot) => mot.minWeight != null
+      );
+      materialData.minWeight = firstWithMinWeight?.minWeight ?? null;
+
+      // Get maxWeight from first MaterialOrderType that has maxWeight
+      const firstWithMaxWeight = materialData.materialOrderTypes.find(
+        (mot) => mot.maxWeight != null
+      );
+      materialData.maxWeight = firstWithMaxWeight?.maxWeight ?? null;
+    } else {
+      materialData.minWeight = null;
+      materialData.maxWeight = null;
+    }
+
+    // Remove materialOrderTypes from response as we only need minWeight and maxWeight
+    delete materialData.materialOrderTypes;
+
+    acc[material.code] = materialData;
     return acc;
   }, {});
 

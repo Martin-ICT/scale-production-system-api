@@ -24,6 +24,8 @@ module.exports = gql`
     clientId: Int!
     materialId: Int!
     orderTypeId: Int
+    minWeight: Int
+    maxWeight: Int
     material: Material
     orderType: ElementValue
   }

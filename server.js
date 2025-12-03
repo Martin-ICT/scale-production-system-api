@@ -45,6 +45,39 @@ const server = new ApolloServer({
       );
     }
 
+    // Simplify GraphQL validation errors (BAD_USER_INPUT) - only for validation errors
+    if (
+      err.extensions?.code === 'BAD_USER_INPUT' &&
+      err.message?.includes('Variable "$input"')
+    ) {
+      // Extract field name from error message
+      const fieldMatch = err.message.match(/at "input\.(\w+)"/);
+      const fieldName = fieldMatch ? fieldMatch[1] : null;
+
+      // Create simplified error message
+      let simplifiedMessage = err.message.split(';')[0] || err.message;
+      if (fieldName) {
+        simplifiedMessage = `${fieldName} is required`;
+      }
+
+      return {
+        message: simplifiedMessage,
+        extensions: {
+          code: 'BAD_USER_INPUT',
+        },
+      };
+    }
+
+    // Simplify resolver errors with BAD_DATA_VALIDATION code (from productionOrderSAPCreateAndUpdate)
+    if (err.extensions?.code === 'BAD_DATA_VALIDATION') {
+      return {
+        message: err.message,
+        extensions: {
+          code: 'BAD_DATA_VALIDATION',
+        },
+      };
+    }
+
     // Error lain biarin aja
     return err;
   },

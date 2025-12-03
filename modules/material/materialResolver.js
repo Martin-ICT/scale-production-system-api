@@ -21,16 +21,6 @@ Material.belongsToMany(ElementValue, {
   as: 'orderTypes',
 });
 
-// Material to MaterialOrderType association
-// Material.hasMany(MaterialOrderType, {
-//   foreignKey: 'materialId',
-//   as: 'materialOrderTypes',
-// });
-// MaterialOrderType.belongsTo(Material, {
-//   foreignKey: 'materialId',
-//   as: 'material',
-// });
-
 module.exports = {
   Query: {
     materialList: combineResolvers(
@@ -98,19 +88,10 @@ module.exports = {
               model: ElementValue,
               as: 'orderTypes',
               where: {
-                code: filter.orderTypeCode,
+                code: filter?.orderTypeCode,
                 clientId: 1000009,
               },
-              required: true, // Only show materials that have this orderType
-            });
-          } else {
-            includeClause.push({
-              model: ElementValue,
-              as: 'orderTypes',
-              where: {
-                clientId: 1000009,
-              },
-              required: false, // Show all materials with their orderTypes
+              required: !!filter?.orderTypeCode, // Only show materials that have this orderType
             });
           }
 
@@ -292,6 +273,68 @@ module.exports = {
       } catch (error) {
         console.error('Error fetching orderTypes for Material:', error);
         return [];
+      }
+    },
+    minWeight: async (material) => {
+      try {
+        // If materialOrderTypes already included in query, use it
+        if (
+          material.materialOrderTypes &&
+          material.materialOrderTypes.length > 0
+        ) {
+          // Get minWeight from first MaterialOrderType that has minWeight
+          const firstWithMinWeight = material.materialOrderTypes.find(
+            (mot) => mot.minWeight != null
+          );
+          return firstWithMinWeight?.minWeight ?? null;
+        }
+
+        // Otherwise, fetch from database
+        const materialOrderType = await MaterialOrderType.findOne({
+          where: {
+            materialId: material.id,
+            clientId: 1000009,
+            minWeight: { [Sequelize.Op.ne]: null },
+          },
+          attributes: ['minWeight'],
+          order: [['id', 'ASC']],
+        });
+
+        return materialOrderType?.minWeight ?? null;
+      } catch (error) {
+        console.error('Error fetching minWeight for Material:', error);
+        return null;
+      }
+    },
+    maxWeight: async (material) => {
+      try {
+        // If materialOrderTypes already included in query, use it
+        if (
+          material.materialOrderTypes &&
+          material.materialOrderTypes.length > 0
+        ) {
+          // Get maxWeight from first MaterialOrderType that has maxWeight
+          const firstWithMaxWeight = material.materialOrderTypes.find(
+            (mot) => mot.maxWeight != null
+          );
+          return firstWithMaxWeight?.maxWeight ?? null;
+        }
+
+        // Otherwise, fetch from database
+        const materialOrderType = await MaterialOrderType.findOne({
+          where: {
+            materialId: material.id,
+            clientId: 1000009,
+            maxWeight: { [Sequelize.Op.ne]: null },
+          },
+          attributes: ['maxWeight'],
+          order: [['id', 'ASC']],
+        });
+
+        return materialOrderType?.maxWeight ?? null;
+      } catch (error) {
+        console.error('Error fetching maxWeight for Material:', error);
+        return null;
       }
     },
   },

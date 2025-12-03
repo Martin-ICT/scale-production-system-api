@@ -22,6 +22,16 @@ const MaterialOrderType = sequelizeWms.define(
         key: 'm_product_id',
       },
     },
+    minWeight: {
+      field: 'z_lower',
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    maxWeight: {
+      field: 'z_upper',
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
     orderTypeId: {
       field: 'z_order_type_id',
       type: DataTypes.INTEGER,

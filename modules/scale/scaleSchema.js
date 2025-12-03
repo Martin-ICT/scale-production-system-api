@@ -29,6 +29,7 @@ module.exports = gql`
       sort: SortBy
     ): ScalePagination
     scaleDetail(id: ID!): Scale
+    scaleDetailByDeviceIp(deviceIP: String!): Scale
   }
 
   extend type Mutation {

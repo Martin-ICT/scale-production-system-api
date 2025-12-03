@@ -21,6 +21,8 @@ module.exports = gql`
     name: String!
     uomId: Int!
     uom: MaterialUom
+    minWeight: Float
+    maxWeight: Float
     orderTypes: [ElementValue] # Changed to array
   }
 

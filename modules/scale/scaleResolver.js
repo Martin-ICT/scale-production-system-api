@@ -412,6 +412,43 @@ module.exports = {
         }
       }
     ),
+
+    scaleDetailByDeviceIp: combineResolvers(
+      // isAuthenticated,
+      // hasPermission('scale.read'),
+      async (_, { deviceIP }) => {
+        try {
+          const scale = await Scale.findOne({
+            where: {
+              deviceIP: deviceIP,
+            },
+          });
+
+          if (!scale) {
+            throw new ApolloError(
+              'Scale not found',
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          const scaleData = scale.toJSON();
+          if (scaleData.uom != null) {
+            scaleData.uom =
+              UOM_MAP[String(scaleData.uom).toLowerCase()] ||
+              scaleData.uom.toUpperCase();
+          }
+          if (scaleData.status != null) {
+            scaleData.status =
+              STATUS_MAP[String(scaleData.status).toLowerCase()] ||
+              scaleData.status.toUpperCase();
+          }
+
+          return scaleData;
+        } catch (err) {
+          throw err;
+        }
+      }
+    ),
   },
 
   Scale: {

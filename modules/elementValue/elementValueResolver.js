@@ -12,7 +12,6 @@ const isAuthenticated = require('../../middlewares/isAuthenticated');
 module.exports = {
   Query: {
     elementValueList: combineResolvers(
-
       isAuthenticated,
       // hasPermission('elementValue.read'),
       pageMinCheckAndPageSizeMax,
@@ -81,8 +80,6 @@ module.exports = {
     ),
 
     elementValueDetail: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('elementValue.read'),
       async (_, { id }) => {
@@ -110,8 +107,6 @@ module.exports = {
     ),
 
     elementValueCount: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('elementValue.read'),
       async (_, { filter }) => {
@@ -144,8 +139,6 @@ module.exports = {
     ),
 
     elementValueByOrderType: combineResolvers(
-
-
       isAuthenticated,
       // hasPermission('elementValue.read'),
       pageMinCheckAndPageSizeMax,

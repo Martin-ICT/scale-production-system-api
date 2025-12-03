@@ -45,6 +45,23 @@ const validateInput = (schema, data) => {
   if (error) joiErrorCallback(error);
 };
 
+// Helper function to throw simplified error message for productionOrderSAPCreateAndUpdate
+const throwSimpleError = (
+  message,
+  code = apolloErrorCodes.BAD_DATA_VALIDATION
+) => {
+  const error = new ApolloError(message, code);
+  // Remove stacktrace and other details to simplify error response
+  error.stack = undefined;
+  // Clean up extensions to only keep code
+  if (error.extensions) {
+    error.extensions = {
+      code: error.extensions.code || code,
+    };
+  }
+  throw error;
+};
+
 // Helper function to fetch productionLocation (ElementValue) based on plantCode
 const attachProductionLocationToResults = async (results) => {
   if (!results || (Array.isArray(results) && results.length === 0)) {
@@ -476,9 +493,8 @@ module.exports = {
           });
 
           if (!material) {
-            throw new ApolloError(
-              'Material not found in WMS for provided materialCode',
-              apolloErrorCodes.BAD_DATA_VALIDATION
+            throwSimpleError(
+              'Material not found in WMS for provided materialCode'
             );
           }
 
@@ -515,6 +531,33 @@ module.exports = {
           }
 
           // If not exists, create new record
+          // Validate required fields for create
+          if (!input.plantCode) {
+            throwSimpleError(
+              'plantCode is required for creating new production order'
+            );
+          }
+          if (!input.orderTypeCode) {
+            throwSimpleError(
+              'orderTypeCode is required for creating new production order'
+            );
+          }
+          if (!input.targetWeight) {
+            throwSimpleError(
+              'targetWeight is required for creating new production order'
+            );
+          }
+          if (!input.productionDate) {
+            throwSimpleError(
+              'productionDate is required for creating new production order'
+            );
+          }
+          if (input.suitability === undefined || input.suitability === null) {
+            throwSimpleError(
+              'suitability is required for creating new production order'
+            );
+          }
+
           const payload = {
             productionOrderNumber: input.productionOrderNumber,
             plantCode: input.plantCode,
