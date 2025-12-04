@@ -7,6 +7,8 @@ const pageMinCheckAndPageSizeMax = require('../../middlewares/pageMinCheckAndPag
 const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const ScaleResults = require('../../models/scaleResults');
+const WeightSummaryBatch = require('../../models/weightSummaryBatch');
+const WeightSummaryBatchItem = require('../../models/weightSummaryBatchItem');
 const hasPermission = require('../../middlewares/hasPermission');
 const isAuthenticated = require('../../middlewares/isAuthenticated');
 
@@ -497,6 +499,172 @@ module.exports = {
           await transaction.commit();
 
           return true;
+        } catch (err) {
+          await transaction.rollback();
+          throw err;
+        }
+      }
+    ),
+
+    scaleResultsUpdateInPendingBatch: combineResolvers(
+      isAuthenticated,
+      // hasPermission('scaleResults.update'),
+      async (_, { id, input }, { user }) => {
+        validateInput(validationSchemas.scaleResultsUpdate, input);
+        const transaction = await ScaleResults.sequelize.transaction();
+
+        try {
+          // Find scaleResult
+          const scaleResult = await ScaleResults.findByPk(id, { transaction });
+
+          if (!scaleResult) {
+            throw new ApolloError(
+              'ScaleResults not found',
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          // Find batch that contains this scaleResult
+          const batch = await WeightSummaryBatch.findOne({
+            where: {
+              scaleResultIdFrom: { [Sequelize.Op.lte]: id },
+              scaleResultIdTo: { [Sequelize.Op.gte]: id },
+              sendToSAP: 'pending',
+            },
+            transaction,
+          });
+
+          if (!batch) {
+            throw new ApolloError(
+              'ScaleResult is not in a pending batch or batch not found',
+              apolloErrorCodes.BAD_DATA_VALIDATION
+            );
+          }
+
+          // Get old values for recalculation
+          const oldScaleResult = scaleResult.toJSON();
+
+          // Map weightConverted to weight_converted for database
+          const updatePayload = mapScaleResultForDB(input);
+
+          // Update scaleResult
+          await scaleResult.update(updatePayload, { transaction });
+
+          // Get updated scaleResult
+          const updatedScaleResult = await ScaleResults.findByPk(id, {
+            transaction,
+          });
+          const newScaleResult = updatedScaleResult.toJSON();
+
+          // Recalculate batch items
+          // Find all scaleResults in this batch
+          const batchScaleResults = await ScaleResults.findAll({
+            where: {
+              id: {
+                [Sequelize.Op.between]: [
+                  batch.scaleResultIdFrom,
+                  batch.scaleResultIdTo,
+                ],
+              },
+            },
+            transaction,
+          });
+
+          // Group by fields (same as in weightSummaryBatchCreateFromScaleResults)
+          const groupKeyFields = [
+            'productionOrderNumber',
+            'materialCode',
+            'productionGroup',
+            'productionShift',
+            'packingGroup',
+            'packingShift',
+            'productionLot',
+            'productionLocation',
+            'storageLocation',
+            'storageLocationTarget',
+            'plantCode',
+          ];
+
+          const groupedResults = {};
+          batchScaleResults.forEach((result) => {
+            const resultData = result.toJSON();
+            const groupKey = groupKeyFields
+              .map((field) => {
+                const value = resultData[field];
+                return `${field}:${
+                  value !== null && value !== undefined ? value : 'null'
+                }`;
+              })
+              .join('|');
+
+            if (!groupedResults[groupKey]) {
+              groupedResults[groupKey] = [];
+            }
+            groupedResults[groupKey].push(resultData);
+          });
+
+          // Delete all existing batch items for this batch
+          await WeightSummaryBatchItem.destroy({
+            where: {
+              weightSummaryBatchId: batch.id,
+            },
+            transaction,
+            force: true,
+          });
+
+          // Recreate batch items for each group
+          const batchItemsToCreate = [];
+          for (const [groupKey, groupResults] of Object.entries(
+            groupedResults
+          )) {
+            if (groupResults.length === 0) continue;
+
+            const firstResult = groupResults[0];
+
+            // Calculate totals for this group
+            const totalWeight = groupResults.reduce((sum, r) => {
+              return sum + (parseFloat(r.weight) || 0);
+            }, 0);
+
+            const totalWeightConverted = groupResults.reduce((sum, r) => {
+              const weightConverted =
+                parseFloat(r.weight_converted || r.weightConverted || 0) || 0;
+              return sum + weightConverted;
+            }, 0);
+
+            batchItemsToCreate.push({
+              weightSummaryBatchId: batch.id,
+              productionOrderNumber: firstResult.productionOrderNumber || '',
+              plantCode: firstResult.plantCode || '',
+              materialCode: firstResult.materialCode || '',
+              materialUom: firstResult.materialUom || null,
+              totalWeight: totalWeight,
+              totalWeightConverted: totalWeightConverted,
+              productionGroup: firstResult.productionGroup || null,
+              productionShift: firstResult.productionShift || null,
+              packingGroup: firstResult.packingGroup || null,
+              packingShift: firstResult.packingShift || null,
+              productionLot: firstResult.productionLot || null,
+              productionLocation: firstResult.productionLocation || null,
+              storageLocation: firstResult.storageLocation || null,
+              storageLocationTarget: firstResult.storageLocationTarget || null,
+              packingDate: firstResult.createdAt
+                ? new Date(firstResult.createdAt)
+                : null,
+              createdBy: user?.userId || null,
+            });
+          }
+
+          // Bulk create new batch items
+          if (batchItemsToCreate.length > 0) {
+            await WeightSummaryBatchItem.bulkCreate(batchItemsToCreate, {
+              transaction,
+            });
+          }
+
+          await transaction.commit();
+
+          return mapScaleResultForResponse(updatedScaleResult);
         } catch (err) {
           await transaction.rollback();
           throw err;

@@ -98,6 +98,17 @@ const WeightSummaryBatchItem = sequelize.define(
       type: DataTypes.DATE,
       allowNull: true,
     },
+    materialDocument: {
+      field: 'material_document',
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    status: {
+      field: 'status',
+      type: DataTypes.ENUM('pending', 'success', 'failed'),
+      defaultValue: 'pending',
+      allowNull: true,
+    },
 
     createdBy: {
       field: 'created_by',

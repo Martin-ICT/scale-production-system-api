@@ -1,8 +1,14 @@
+require('dotenv').config();
 const { ApolloError } = require('apollo-server');
 const { combineResolvers } = require('graphql-resolvers');
 const Joi = require('joi');
 const { Sequelize } = require('sequelize');
+const axios = require('axios');
 const apolloErrorCodes = require('../../constants/apolloErrorCodes');
+const {
+  convertDateToCustomFormat,
+  formatDateTimeForSAP,
+} = require('../../helpers/dateConverter');
 const pageMinCheckAndPageSizeMax = require('../../middlewares/pageMinCheckAndPageSizeMax');
 const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
@@ -11,6 +17,7 @@ const WeightSummaryBatchItem = require('../../models/weightSummaryBatchItem');
 const ProductionOrderDetail = require('../../models/productionOrderDetail');
 const ProductionOrderSAP = require('../../models/productionOrderSAP');
 const ScaleResults = require('../../models/scaleResults');
+const OrderType = require('../../models/orderType');
 const hasPermission = require('../../middlewares/hasPermission');
 const isAuthenticated = require('../../middlewares/isAuthenticated');
 
@@ -101,6 +108,23 @@ const validationSchemas = {
     sendToSAP: Joi.string()
       .valid('PENDING', 'PROCESSED', 'SENDING', 'FAILED', 'SUCCESS')
       .required(),
+  }),
+  weightSummaryBatchItemUpdate: Joi.object({
+    productionOrderNumber: Joi.string().max(20).optional().allow(null, ''),
+    plantCode: Joi.string().max(10).optional().allow(null, ''),
+    materialCode: Joi.string().max(10).optional().allow(null, ''),
+    materialUom: Joi.string().max(10).optional().allow(null, ''),
+    totalWeight: Joi.number().optional().allow(null),
+    totalWeightConverted: Joi.number().optional().allow(null),
+    productionGroup: Joi.string().max(2).optional().allow(null, ''),
+    productionShift: Joi.number().integer().optional().allow(null),
+    packingGroup: Joi.string().max(10).optional().allow(null, ''),
+    packingShift: Joi.number().integer().optional().allow(null),
+    productionLot: Joi.string().max(10).optional().allow(null, ''),
+    productionLocation: Joi.string().max(10).optional().allow(null, ''),
+    storageLocation: Joi.string().max(10).optional().allow(null, ''),
+    storageLocationTarget: Joi.string().max(10).optional().allow(null, ''),
+    packingDate: Joi.date().optional().allow(null),
   }),
 };
 
@@ -1128,6 +1152,486 @@ module.exports = {
           }
 
           return batchData;
+        } catch (err) {
+          await transaction.rollback();
+          throw err;
+        }
+      }
+    ),
+
+    sendWeightSummaryBatchItemToSAP: combineResolvers(
+      isAuthenticated,
+      // hasPermission('weightSummaryBatch.sendToSAP'),
+      async (_, { id }, { user }) => {
+        const transaction = await WeightSummaryBatch.sequelize.transaction();
+
+        try {
+          // Find batch with all related data
+          const batch = await WeightSummaryBatch.findByPk(id, {
+            transaction,
+            include: [
+              {
+                model: ProductionOrderDetail,
+                as: 'productionOrderDetail',
+                required: true,
+                include: [
+                  {
+                    model: ProductionOrderSAP,
+                    as: 'productionOrderSAP',
+                    required: true,
+                    attributes: [
+                      'id',
+                      'productionOrderNumber',
+                      'plantCode',
+                      'orderTypeCode',
+                      'productionDate',
+                    ],
+                  },
+                  {
+                    model: OrderType,
+                    as: 'orderType',
+                    required: false,
+                    attributes: ['id', 'code', 'processType'],
+                  },
+                ],
+              },
+              {
+                model: WeightSummaryBatchItem,
+                as: 'WeightSummaryBatchItems',
+                required: true,
+              },
+            ],
+          });
+
+          if (!batch) {
+            throw new ApolloError(
+              'Weight Summary Batch not found',
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          // Check if batch is in pending or processed status
+          if (batch.sendToSAP !== 'processed') {
+            throw new ApolloError(
+              `Batch cannot be sent to SAP. Current status: ${batch.sendToSAP}`,
+              apolloErrorCodes.BAD_DATA_VALIDATION
+            );
+          }
+
+          // SAP API Configuration from environment variables
+          const batchData = batch.toJSON();
+          const productionOrderSAP =
+            batchData.productionOrderDetail?.productionOrderSAP;
+
+          const config = {
+            url:
+              process.env.SAP_API_URL ||
+              'http://10.204.10.15:8000/sap/bc/zws/zfmws_write_grcpf_autotosap',
+            client: process.env.SAP_CLIENT || '363',
+            user: process.env.SAP_USER || 'auto_ws',
+            password: process.env.SAP_PASSWORD || 'initial',
+          };
+
+          const orderType = batchData.productionOrderDetail?.orderType;
+
+          if (!productionOrderSAP) {
+            throw new ApolloError(
+              'Production Order SAP not found',
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          // Map batch items to SAP format
+          const sapData = batchData.WeightSummaryBatchItems.map(
+            (item, index) => {
+              const packingDate = item.packingDate
+                ? new Date(item.packingDate)
+                : new Date();
+              const productionDate = productionOrderSAP.productionDate
+                ? new Date(productionOrderSAP.productionDate)
+                : new Date();
+
+              return {
+                SAPID: item.id,
+                CAUFV_AUFNR: productionOrderSAP.productionOrderNumber || '',
+                CAUFV_WERKS:
+                  item.plantCode || productionOrderSAP.plantCode || '',
+                CAUFV_AUART: productionOrderSAP.orderTypeCode || '',
+                AFRUD_ISDD: productionDate
+                  .toISOString()
+                  .replace('T', ' ')
+                  .substring(0, 19),
+                MSEG_MATNR: item.materialCode || '',
+                MSEG_MENGE: parseFloat(item.totalWeight) || 0,
+                MSEG_ERFME: item.materialUom || 'KG',
+                MSEG_CONVMENGE: parseFloat(item.totalWeightConverted) || 0,
+                MSEG_MEINS: item.materialUom || 'KG',
+                MSEG_LGORT: item.storageLocation || '',
+                MSEG_LGORTTO: item.storageLocationTarget || '',
+                MSEG_WEMPF: user.name,
+                AUSP_YMDD: item.createdAt
+                  ? convertDateToCustomFormat(item.createdAt)
+                  : '',
+                AUSP_PRODLOC: item.productionLocation || '',
+                AUSP_PRODLOT: item.productionLot || '',
+                AUSP_PRODGROUP: item.productionGroup || '',
+                AUSP_PACKGROUP: item.packingGroup || '',
+                AUSP_PROCTYPE: orderType?.processType?.toString() || '0',
+                AUSP_PACKDATE: packingDate.toISOString().split('T')[0],
+                AUSP_PRODSHIFT: item.productionShift?.toString() || '',
+                // AUSP_PACKSHIFT: item.packingShift?.toString() || '',
+                AUSP_PACKSHIFT: item.packingShift?.toString() || '',
+                AUSP_PRODLINE: '',
+                AUSP_PACKLINE: '',
+                KEY_STATUS: '0', //ada soft delete masuk
+                INSERT_TIME: formatDateTimeForSAP(),
+                UPDATE_TIME: formatDateTimeForSAP(),
+              };
+            }
+          );
+
+          // Update batch status to SENDING
+          await batch.update(
+            {
+              sendToSAP: 'sending',
+              updatedBy: user?.userId || null,
+            },
+            { transaction }
+          );
+
+          await transaction.commit();
+
+          // Send to SAP API
+          try {
+            const response = await axios.post(
+              config.url,
+              { DATA: sapData },
+              {
+                headers: {
+                  'sap-client': config.client,
+                  'sap-user': config.user,
+                  'sap-password': config.password,
+                  'Content-Type': 'application/json',
+                },
+                timeout: 30000, // 30 seconds timeout
+              }
+            );
+
+            console.log('CI IKA', response);
+
+            // Only proceed if response is successful (status 200-299)
+            if (response.status >= 200 && response.status < 300) {
+              // Update batch status to SUCCESS
+              await batch.update({
+                sendToSAP: 'success',
+                updatedBy: user?.userId || null,
+              });
+
+              // Update ProductionOrderDetail.totalWeighedGoodReceive
+              const productionOrderDetailId = batch.productionOrderDetailId;
+              if (productionOrderDetailId) {
+                const allBatches = await WeightSummaryBatch.findAll({
+                  where: { productionOrderDetailId: productionOrderDetailId },
+                  attributes: ['id', 'sendToSAP'],
+                });
+
+                const goodReceiveBatches = allBatches.filter(
+                  (b) => b.sendToSAP === 'sending' || b.sendToSAP === 'success'
+                );
+
+                let totalWeighedGoodReceive = 0;
+                if (goodReceiveBatches.length > 0) {
+                  const goodReceiveBatchIds = goodReceiveBatches.map(
+                    (b) => b.id
+                  );
+                  const goodReceiveWeightResult =
+                    await WeightSummaryBatchItem.findAll({
+                      where: {
+                        weightSummaryBatchId: {
+                          [Sequelize.Op.in]: goodReceiveBatchIds,
+                        },
+                      },
+                      attributes: [
+                        [
+                          Sequelize.fn(
+                            'SUM',
+                            Sequelize.col('total_weight_converted')
+                          ),
+                          'totalWeight',
+                        ],
+                      ],
+                      raw: true,
+                    });
+
+                  totalWeighedGoodReceive = parseFloat(
+                    goodReceiveWeightResult[0]?.totalWeight || 0
+                  );
+                }
+
+                await ProductionOrderDetail.update(
+                  {
+                    totalWeighedGoodReceive: totalWeighedGoodReceive,
+                  },
+                  { where: { id: productionOrderDetailId } }
+                );
+              }
+
+              // Reload batch with associations
+              await batch.reload({
+                include: [
+                  {
+                    model: ProductionOrderDetail,
+                    as: 'productionOrderDetail',
+                  },
+                ],
+              });
+
+              const batchDataResponse = batch.toJSON();
+              if (batchDataResponse.sendToSAP != null) {
+                batchDataResponse.sendToSAP =
+                  SEND_TO_SAP_MAP[
+                    String(batchDataResponse.sendToSAP).toLowerCase()
+                  ] || batchDataResponse.sendToSAP.toUpperCase();
+              }
+
+              return batchDataResponse;
+            } else {
+              // Response status is not successful, throw error
+              throw new ApolloError(
+                `SAP API returned non-success status: ${response.status}`,
+                apolloErrorCodes.INTERNAL_SERVER_ERROR,
+                {
+                  sapResponse: response.data,
+                  statusCode: response.status,
+                }
+              );
+            }
+          } catch (sapError) {
+            // Update batch status to FAILED
+            await batch.update({
+              sendToSAP: 'failed',
+              updatedBy: user?.userId || null,
+            });
+
+            const errorMessage =
+              sapError.response?.data?.message ||
+              sapError.message ||
+              'Failed to send data to SAP';
+
+            throw new ApolloError(
+              `SAP API Error: ${errorMessage}`,
+              apolloErrorCodes.INTERNAL_SERVER_ERROR,
+              {
+                sapResponse: sapError.response?.data,
+                statusCode: sapError.response?.status,
+              }
+            );
+          }
+        } catch (err) {
+          if (!transaction.finished) {
+            await transaction.rollback();
+          }
+          throw err;
+        }
+      }
+    ),
+
+    weightSummaryBatchItemUpdate: combineResolvers(
+      isAuthenticated,
+      // hasPermission('weightSummaryBatchItem.update'),
+      async (_, { id, input }, { user }) => {
+        validateInput(validationSchemas.weightSummaryBatchItemUpdate, input);
+        const transaction =
+          await WeightSummaryBatchItem.sequelize.transaction();
+
+        try {
+          // Find the batch item
+          const batchItem = await WeightSummaryBatchItem.findByPk(id, {
+            transaction,
+            include: [
+              {
+                model: WeightSummaryBatch,
+                as: 'weightSummaryBatch',
+                required: true,
+              },
+            ],
+          });
+
+          if (!batchItem) {
+            throw new ApolloError(
+              'Weight Summary Batch Item not found',
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          // Check if batch status is 'processed'
+          const batch = batchItem.weightSummaryBatch;
+          if (batch.sendToSAP !== 'processed') {
+            throw new ApolloError(
+              `Batch Item can only be updated when batch status is PROCESSED. Current status: ${batch.sendToSAP}`,
+              apolloErrorCodes.BAD_DATA_VALIDATION
+            );
+          }
+
+          // Get old values before update
+          const oldItem = batchItem.toJSON();
+
+          // Prepare update payload
+          const updatePayload = {
+            ...input,
+            updatedBy: user?.userId || null,
+          };
+
+          // Update the item
+          await batchItem.update(updatePayload, { transaction });
+
+          // Reload to get updated values
+          await batchItem.reload({ transaction });
+          const updatedItem = batchItem.toJSON();
+
+          // Build grouping key from updated item
+          const groupKeyFields = [
+            'productionOrderNumber',
+            'materialCode',
+            'productionGroup',
+            'productionShift',
+            'packingGroup',
+            'packingShift',
+            'productionLot',
+            'productionLocation',
+            'storageLocation',
+            'storageLocationTarget',
+            'plantCode',
+          ];
+
+          const buildGroupKey = (item) => {
+            return groupKeyFields
+              .map((field) => {
+                const value = item[field];
+                return `${field}:${
+                  value !== null && value !== undefined ? value : 'null'
+                }`;
+              })
+              .join('|');
+          };
+
+          const updatedGroupKey = buildGroupKey(updatedItem);
+
+          // Find other items in the same batch with the same grouping (excluding current item)
+          const duplicateItems = await WeightSummaryBatchItem.findAll({
+            where: {
+              weightSummaryBatchId: batch.id,
+              id: { [Sequelize.Op.ne]: id },
+              deletedAt: null,
+            },
+            transaction,
+          });
+
+          // Find items with matching group key
+          const matchingItems = duplicateItems.filter((item) => {
+            const itemData = item.toJSON();
+            const itemGroupKey = buildGroupKey(itemData);
+            return itemGroupKey === updatedGroupKey;
+          });
+
+          if (matchingItems.length > 0) {
+            // Merge: Use the first matching item as the target
+            const targetItem = matchingItems[0];
+            const targetItemData = targetItem.toJSON();
+
+            // Calculate new totals (add weight from updated item to target item)
+            const newTotalWeight =
+              (parseFloat(targetItemData.totalWeight) || 0) +
+              (parseFloat(updatedItem.totalWeight) || 0);
+            const newTotalWeightConverted =
+              (parseFloat(targetItemData.totalWeightConverted) || 0) +
+              (parseFloat(updatedItem.totalWeightConverted) || 0);
+
+            // Prepare merge payload - use updated values for non-numeric fields if they were provided
+            const mergePayload = {
+              totalWeight: newTotalWeight,
+              totalWeightConverted: newTotalWeightConverted,
+              updatedBy: user?.userId || null,
+            };
+
+            // Update non-numeric fields from input if provided (use updated values)
+            if (input.productionOrderNumber !== undefined) {
+              mergePayload.productionOrderNumber =
+                updatedItem.productionOrderNumber;
+            }
+            if (input.plantCode !== undefined) {
+              mergePayload.plantCode = updatedItem.plantCode;
+            }
+            if (input.materialCode !== undefined) {
+              mergePayload.materialCode = updatedItem.materialCode;
+            }
+            if (input.materialUom !== undefined) {
+              mergePayload.materialUom = updatedItem.materialUom;
+            }
+            if (input.productionGroup !== undefined) {
+              mergePayload.productionGroup = updatedItem.productionGroup;
+            }
+            if (input.productionShift !== undefined) {
+              mergePayload.productionShift = updatedItem.productionShift;
+            }
+            if (input.packingGroup !== undefined) {
+              mergePayload.packingGroup = updatedItem.packingGroup;
+            }
+            if (input.packingShift !== undefined) {
+              mergePayload.packingShift = updatedItem.packingShift;
+            }
+            if (input.productionLot !== undefined) {
+              mergePayload.productionLot = updatedItem.productionLot;
+            }
+            if (input.productionLocation !== undefined) {
+              mergePayload.productionLocation = updatedItem.productionLocation;
+            }
+            if (input.storageLocation !== undefined) {
+              mergePayload.storageLocation = updatedItem.storageLocation;
+            }
+            if (input.storageLocationTarget !== undefined) {
+              mergePayload.storageLocationTarget =
+                updatedItem.storageLocationTarget;
+            }
+            if (input.packingDate !== undefined) {
+              mergePayload.packingDate = updatedItem.packingDate;
+            }
+
+            // Update target item with merged data
+            await targetItem.update(mergePayload, { transaction });
+
+            // Soft delete the updated item (the one we just updated)
+            await batchItem.destroy({ transaction });
+
+            await transaction.commit();
+
+            // Reload target item with associations
+            await targetItem.reload({
+              include: [
+                {
+                  model: WeightSummaryBatch,
+                  as: 'weightSummaryBatch',
+                },
+              ],
+            });
+
+            return targetItem;
+          } else {
+            // No duplicate grouping, just return the updated item
+            await transaction.commit();
+
+            // Reload with associations
+            await batchItem.reload({
+              include: [
+                {
+                  model: WeightSummaryBatch,
+                  as: 'weightSummaryBatch',
+                },
+              ],
+            });
+
+            return batchItem;
+          }
         } catch (err) {
           await transaction.rollback();
           throw err;

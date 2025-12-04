@@ -24,6 +24,10 @@ module.exports = gql`
       input: ScaleResultsInputBatchCreate!
     ): [ScaleResults!]!
     scaleResultsUpdate(id: ID!, input: ScaleResultsInputUpdate!): ScaleResults
+    scaleResultsUpdateInPendingBatch(
+      id: ID!
+      input: ScaleResultsInputUpdate!
+    ): ScaleResults
     scaleResultsDelete(id: ID!): Boolean
   }
 

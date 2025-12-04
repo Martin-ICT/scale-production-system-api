@@ -26,6 +26,29 @@ module.exports = gql`
     ): WeightSummaryBatch
     weightSummaryBatchDelete(id: ID!): Boolean
     weightSummaryBatchCreateFromScaleResults: [WeightSummaryBatch!]!
+    sendWeightSummaryBatchItemToSAP(id: ID!): WeightSummaryBatch
+    weightSummaryBatchItemUpdate(
+      id: ID!
+      input: WeightSummaryBatchItemInputUpdate!
+    ): WeightSummaryBatchItem
+  }
+
+  input WeightSummaryBatchItemInputUpdate {
+    productionOrderNumber: String
+    plantCode: String
+    materialCode: String
+    materialUom: String
+    totalWeight: Float
+    totalWeightConverted: Float
+    productionGroup: String
+    productionShift: Int
+    packingGroup: String
+    packingShift: Int
+    productionLot: String
+    productionLocation: String
+    storageLocation: String
+    storageLocationTarget: String
+    packingDate: DateTime
   }
 
   enum WeightSummaryBatchSendToSAP {

@@ -29,13 +29,4 @@ const StorageLocationTarget = sequelize.define(
   }
 );
 
-StorageLocationTarget.associate = (models) => {
-  StorageLocationTarget.belongsToMany(models.OrderType, {
-    through: models.OrderTypeStorageLocationTarget,
-    foreignKey: 'storageLocationTargetId',
-    as: 'orderTypes',
-  });
-};
-
 module.exports = StorageLocationTarget;
-
