@@ -15,6 +15,7 @@ const StorageLocation = require('./storageLocation');
 const StorageLocationTarget = require('./storageLocationTarget');
 const WeightSummaryBatch = require('./weightSummaryBatch');
 const WeightSummaryBatchItem = require('./weightSummaryBatchItem');
+const WeightSummaryBatchItemLog = require('./weightSummaryBatchItemLog');
 // const ProductionPlanning = require('./productionPlanning');
 // const ProductionPlanningLine = require('./productionPlanningLine');
 
@@ -35,6 +36,7 @@ const models = {
   StorageLocationTarget,
   WeightSummaryBatch,
   WeightSummaryBatchItem,
+  WeightSummaryBatchItemLog,
 };
 
 Object.keys(models).forEach((modelName) => {

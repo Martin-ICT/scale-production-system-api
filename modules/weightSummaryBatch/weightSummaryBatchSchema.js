@@ -31,6 +31,13 @@ module.exports = gql`
       id: ID!
       input: WeightSummaryBatchItemInputUpdate!
     ): WeightSummaryBatchItem
+    weightSummaryBatchItemUpdateStatusMultiple(
+      ids: [ID!]!
+      status: WeightSummaryBatchItemStatus!
+    ): [WeightSummaryBatchItem!]!
+    weightSummaryBatchItemUpdateForSAP(
+      items: [WeightSummaryBatchItemUpdateForSAPInput!]!
+    ): [WeightSummaryBatchItem!]!
   }
 
   input WeightSummaryBatchItemInputUpdate {
@@ -51,12 +58,24 @@ module.exports = gql`
     packingDate: DateTime
   }
 
+  input WeightSummaryBatchItemUpdateForSAPInput {
+    id: ID!
+    status: WeightSummaryBatchItemStatus!
+    materialDocument: String
+  }
+
   enum WeightSummaryBatchSendToSAP {
     PENDING
     PROCESSED
     SENDING
     FAILED
     SUCCESS
+  }
+
+  enum WeightSummaryBatchItemStatus {
+    PENDING
+    SUCCESS
+    FAILED
   }
 
   input WeightSummaryBatchInputCreate {
@@ -113,6 +132,8 @@ module.exports = gql`
     storageLocationTarget: String
     weightSummaryBatchId: Int
     packingDate: DateTime
+    materialDocument: String
+    status: WeightSummaryBatchItemStatus
     createdAt: DateTime!
     updatedAt: DateTime!
     deletedAt: DateTime

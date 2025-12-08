@@ -14,6 +14,7 @@ const { joiErrorCallback } = require('../../helpers/errorHelper');
 const definedSearch = require('../../helpers/definedSearch');
 const WeightSummaryBatch = require('../../models/weightSummaryBatch');
 const WeightSummaryBatchItem = require('../../models/weightSummaryBatchItem');
+const WeightSummaryBatchItemLog = require('../../models/weightSummaryBatchItemLog');
 const ProductionOrderDetail = require('../../models/productionOrderDetail');
 const ProductionOrderSAP = require('../../models/productionOrderSAP');
 const ScaleResults = require('../../models/scaleResults');
@@ -125,6 +126,33 @@ const validationSchemas = {
     storageLocation: Joi.string().max(10).optional().allow(null, ''),
     storageLocationTarget: Joi.string().max(10).optional().allow(null, ''),
     packingDate: Joi.date().optional().allow(null),
+  }),
+  weightSummaryBatchItemUpdateStatusMultiple: Joi.object({
+    ids: Joi.array().items(Joi.number().integer().required()).min(1).required(),
+    status: Joi.string()
+      .valid('PENDING', 'SUCCESS', 'FAILED', 'pending', 'success', 'failed')
+      .required(),
+  }),
+  weightSummaryBatchItemUpdateForSAP: Joi.object({
+    items: Joi.array()
+      .items(
+        Joi.object({
+          id: Joi.number().integer().required(),
+          status: Joi.string()
+            .valid(
+              'PENDING',
+              'SUCCESS',
+              'FAILED',
+              'pending',
+              'success',
+              'failed'
+            )
+            .required(),
+          materialDocument: Joi.string().max(50).optional().allow(null, ''),
+        })
+      )
+      .min(1)
+      .required(),
   }),
 };
 
@@ -1327,6 +1355,19 @@ module.exports = {
                 updatedBy: user?.userId || null,
               });
 
+              // Update all WeightSummaryBatchItem status to success
+              await WeightSummaryBatchItem.update(
+                {
+                  status: 'success',
+                  updatedBy: user?.userId || null,
+                },
+                {
+                  where: {
+                    weightSummaryBatchId: id,
+                  },
+                }
+              );
+
               // Update ProductionOrderDetail.totalWeighedGoodReceive
               const productionOrderDetailId = batch.productionOrderDetailId;
               if (productionOrderDetailId) {
@@ -1396,6 +1437,19 @@ module.exports = {
 
               return batchDataResponse;
             } else {
+              // Update all WeightSummaryBatchItem status to failed
+              await WeightSummaryBatchItem.update(
+                {
+                  status: 'failed',
+                  updatedBy: user?.userId || null,
+                },
+                {
+                  where: {
+                    weightSummaryBatchId: id,
+                  },
+                }
+              );
+
               // Response status is not successful, throw error
               throw new ApolloError(
                 `SAP API returned non-success status: ${response.status}`,
@@ -1412,6 +1466,19 @@ module.exports = {
               sendToSAP: 'failed',
               updatedBy: user?.userId || null,
             });
+
+            // Update all WeightSummaryBatchItem status to failed
+            await WeightSummaryBatchItem.update(
+              {
+                status: 'failed',
+                updatedBy: user?.userId || null,
+              },
+              {
+                where: {
+                  weightSummaryBatchId: id,
+                },
+              }
+            );
 
             const errorMessage =
               sapError.response?.data?.message ||
@@ -1475,7 +1542,128 @@ module.exports = {
 
           // Get old values before update
           const oldItem = batchItem.toJSON();
+          const oldStatus = oldItem.status || 'pending';
 
+          // Check status: if 'failed', create new item and log; if 'pending', update directly
+          if (oldStatus === 'failed') {
+            // Soft delete the old item
+            await batchItem.destroy({ transaction });
+
+            // Create new item with updated data
+            const newItemData = {
+              productionOrderNumber:
+                input.productionOrderNumber !== undefined
+                  ? input.productionOrderNumber
+                  : oldItem.productionOrderNumber,
+              plantCode:
+                input.plantCode !== undefined
+                  ? input.plantCode
+                  : oldItem.plantCode,
+              materialCode:
+                input.materialCode !== undefined
+                  ? input.materialCode
+                  : oldItem.materialCode,
+              materialUom:
+                input.materialUom !== undefined
+                  ? input.materialUom
+                  : oldItem.materialUom,
+              totalWeight:
+                input.totalWeight !== undefined
+                  ? input.totalWeight
+                  : oldItem.totalWeight,
+              totalWeightConverted:
+                input.totalWeightConverted !== undefined
+                  ? input.totalWeightConverted
+                  : oldItem.totalWeightConverted,
+              productionGroup:
+                input.productionGroup !== undefined
+                  ? input.productionGroup
+                  : oldItem.productionGroup,
+              productionShift:
+                input.productionShift !== undefined
+                  ? input.productionShift
+                  : oldItem.productionShift,
+              packingGroup:
+                input.packingGroup !== undefined
+                  ? input.packingGroup
+                  : oldItem.packingGroup,
+              packingShift:
+                input.packingShift !== undefined
+                  ? input.packingShift
+                  : oldItem.packingShift,
+              productionLot:
+                input.productionLot !== undefined
+                  ? input.productionLot
+                  : oldItem.productionLot,
+              productionLocation:
+                input.productionLocation !== undefined
+                  ? input.productionLocation
+                  : oldItem.productionLocation,
+              storageLocation:
+                input.storageLocation !== undefined
+                  ? input.storageLocation
+                  : oldItem.storageLocation,
+              storageLocationTarget:
+                input.storageLocationTarget !== undefined
+                  ? input.storageLocationTarget
+                  : oldItem.storageLocationTarget,
+              weightSummaryBatchId: batch.id,
+              packingDate:
+                input.packingDate !== undefined
+                  ? input.packingDate
+                  : oldItem.packingDate,
+              status: 'pending', // New item starts with pending status
+              createdBy: user?.userId || null,
+            };
+
+            const newItem = await WeightSummaryBatchItem.create(newItemData, {
+              transaction,
+            });
+
+            // Create log entry
+            await WeightSummaryBatchItemLog.create(
+              {
+                idFrom: oldItem.id, // ID of the old (soft deleted) item
+                idTo: newItem.id, // ID of the new item
+                totalWeight: parseFloat(oldItem.totalWeight) || 0,
+                totalWeightConverted:
+                  parseFloat(oldItem.totalWeightConverted) || 0,
+                createdBy: user?.userId || null,
+              },
+              { transaction }
+            );
+
+            // Reload new item with associations
+            await newItem.reload({
+              include: [
+                {
+                  model: WeightSummaryBatch,
+                  as: 'weightSummaryBatch',
+                },
+              ],
+              transaction,
+            });
+
+            // Convert status from database to GraphQL enum format before commit
+            const STATUS_MAP_NEW = {
+              pending: 'PENDING',
+              success: 'SUCCESS',
+              failed: 'FAILED',
+            };
+
+            const newItemResponse = newItem.toJSON();
+            if (newItemResponse.status != null) {
+              newItemResponse.status =
+                STATUS_MAP_NEW[String(newItemResponse.status).toLowerCase()] ||
+                newItemResponse.status.toUpperCase();
+            }
+
+            await transaction.commit();
+
+            return newItemResponse;
+          }
+
+          // If status is 'pending', update directly
           // Prepare update payload
           const updatePayload = {
             ...input,
@@ -1603,9 +1791,7 @@ module.exports = {
             // Soft delete the updated item (the one we just updated)
             await batchItem.destroy({ transaction });
 
-            await transaction.commit();
-
-            // Reload target item with associations
+            // Reload target item with associations before commit
             await targetItem.reload({
               include: [
                 {
@@ -1613,14 +1799,30 @@ module.exports = {
                   as: 'weightSummaryBatch',
                 },
               ],
+              transaction,
             });
 
-            return targetItem;
-          } else {
-            // No duplicate grouping, just return the updated item
+            // Convert status from database to GraphQL enum format before commit
+            const STATUS_MAP_MERGE = {
+              pending: 'PENDING',
+              success: 'SUCCESS',
+              failed: 'FAILED',
+            };
+
+            const targetItemResponse = targetItem.toJSON();
+            if (targetItemResponse.status != null) {
+              targetItemResponse.status =
+                STATUS_MAP_MERGE[
+                  String(targetItemResponse.status).toLowerCase()
+                ] || targetItemResponse.status.toUpperCase();
+            }
+
             await transaction.commit();
 
-            // Reload with associations
+            return targetItemResponse;
+          } else {
+            // No duplicate grouping, just return the updated item
+            // Reload with associations before commit
             await batchItem.reload({
               include: [
                 {
@@ -1628,10 +1830,213 @@ module.exports = {
                   as: 'weightSummaryBatch',
                 },
               ],
+              transaction,
             });
 
-            return batchItem;
+            // Convert status from database to GraphQL enum format before commit
+            const STATUS_MAP_UPDATE = {
+              pending: 'PENDING',
+              success: 'SUCCESS',
+              failed: 'FAILED',
+            };
+
+            const batchItemResponse = batchItem.toJSON();
+            if (batchItemResponse.status != null) {
+              batchItemResponse.status =
+                STATUS_MAP_UPDATE[
+                  String(batchItemResponse.status).toLowerCase()
+                ] || batchItemResponse.status.toUpperCase();
+            }
+
+            await transaction.commit();
+
+            return batchItemResponse;
           }
+        } catch (err) {
+          await transaction.rollback();
+          throw err;
+        }
+      }
+    ),
+
+    weightSummaryBatchItemUpdateForSAP: combineResolvers(
+      isAuthenticated,
+      // hasPermission('weightSummaryBatchItem.update'),
+      async (_, { items }, { user }) => {
+        validateInput(validationSchemas.weightSummaryBatchItemUpdateForSAP, {
+          items,
+        });
+        const transaction =
+          await WeightSummaryBatchItem.sequelize.transaction();
+
+        try {
+          // Convert GraphQL enum to database value
+          const statusMap = {
+            PENDING: 'pending',
+            SUCCESS: 'success',
+            FAILED: 'failed',
+            pending: 'pending',
+            success: 'success',
+            failed: 'failed',
+          };
+
+          // Extract IDs from items array
+          const ids = items.map((item) => Number(item.id));
+
+          // Find all items by IDs
+          const batchItems = await WeightSummaryBatchItem.findAll({
+            where: {
+              id: { [Sequelize.Op.in]: ids },
+              deletedAt: null,
+            },
+            transaction,
+          });
+
+          if (batchItems.length === 0) {
+            throw new ApolloError(
+              'No Weight Summary Batch Items found with provided IDs',
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          if (batchItems.length !== ids.length) {
+            const foundIds = batchItems.map((item) => item.id);
+            const notFoundIds = ids.filter(
+              (id) => !foundIds.includes(Number(id))
+            );
+            throw new ApolloError(
+              `Some Weight Summary Batch Items not found. IDs: ${notFoundIds.join(
+                ', '
+              )}`,
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          // Get unique batch IDs from items that will be updated
+          const uniqueBatchIds = [
+            ...new Set(
+              batchItems
+                .map((item) => item.weightSummaryBatchId)
+                .filter(Boolean)
+            ),
+          ];
+
+          // Update each item individually with its specific status and Matdoc
+          const updatePromises = items.map(async (item) => {
+            const itemId = Number(item.id);
+            const dbStatus =
+              statusMap[item.status] || item.status.toLowerCase();
+
+            // Validate status
+            if (!['pending', 'success', 'failed'].includes(dbStatus)) {
+              throw new ApolloError(
+                `Invalid status: ${item.status}. Must be one of: PENDING, SUCCESS, FAILED`,
+                apolloErrorCodes.BAD_DATA_VALIDATION
+              );
+            }
+
+            const updatePayload = {
+              status: dbStatus,
+              updatedBy: user?.userId || null,
+            };
+
+            // Add materialDocument if Matdoc is provided
+            if (
+              item.materialDocument !== undefined &&
+              item.materialDocument !== null
+            ) {
+              updatePayload.materialDocument = item.materialDocument;
+            }
+
+            return WeightSummaryBatchItem.update(updatePayload, {
+              where: { id: itemId },
+              transaction,
+            });
+          });
+
+          await Promise.all(updatePromises);
+
+          // Update batch status based on items status
+          // If all items are SUCCESS, batch becomes SUCCESS
+          // If any item is FAILED, batch becomes PROCESSED
+          if (uniqueBatchIds.length > 0) {
+            for (const batchId of uniqueBatchIds) {
+              // Get all items in this batch
+              const allBatchItems = await WeightSummaryBatchItem.findAll({
+                where: {
+                  weightSummaryBatchId: batchId,
+                  deletedAt: null,
+                },
+                attributes: ['id', 'status'],
+                transaction,
+              });
+
+              // Check if all items are success
+              const allSuccess = allBatchItems.every(
+                (item) => item.status === 'success'
+              );
+
+              // Check if any item is failed
+              const hasFailed = allBatchItems.some(
+                (item) => item.status === 'failed'
+              );
+
+              let batchStatus;
+              if (allSuccess) {
+                // All items are success, batch becomes SUCCESS
+                batchStatus = 'success';
+              } else if (hasFailed) {
+                // At least one item is failed, batch becomes PROCESSED
+                batchStatus = 'processed';
+              } else {
+                // Some items might still be pending, keep as PROCESSED
+                batchStatus = 'processed';
+              }
+
+              await WeightSummaryBatch.update(
+                {
+                  sendToSAP: batchStatus,
+                  updatedBy: user?.userId || null,
+                },
+                {
+                  where: { id: batchId },
+                  transaction,
+                }
+              );
+            }
+          }
+
+          await transaction.commit();
+
+          // Reload all items with associations
+          const updatedItems = await WeightSummaryBatchItem.findAll({
+            where: {
+              id: { [Sequelize.Op.in]: ids },
+            },
+            include: [
+              {
+                model: WeightSummaryBatch,
+                as: 'weightSummaryBatch',
+              },
+            ],
+          });
+
+          // Convert status from database to GraphQL enum format
+          const STATUS_MAP = {
+            pending: 'PENDING',
+            success: 'SUCCESS',
+            failed: 'FAILED',
+          };
+
+          return updatedItems.map((item) => {
+            const itemData = item.toJSON();
+            if (itemData.status != null) {
+              itemData.status =
+                STATUS_MAP[String(itemData.status).toLowerCase()] ||
+                itemData.status.toUpperCase();
+            }
+            return itemData;
+          });
         } catch (err) {
           await transaction.rollback();
           throw err;
