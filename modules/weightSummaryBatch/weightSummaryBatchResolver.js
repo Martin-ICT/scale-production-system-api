@@ -1345,13 +1345,11 @@ module.exports = {
               }
             );
 
-            console.log('CI IKA', response);
-
             // Only proceed if response is successful (status 200-299)
             if (response.status >= 200 && response.status < 300) {
               // Update batch status to SUCCESS
               await batch.update({
-                sendToSAP: 'success',
+                sendToSAP: 'sending',
                 updatedBy: user?.userId || null,
               });
 
@@ -1860,7 +1858,7 @@ module.exports = {
     ),
 
     weightSummaryBatchItemUpdateForSAP: combineResolvers(
-      isAuthenticated,
+      // isAuthenticated,
       // hasPermission('weightSummaryBatchItem.update'),
       async (_, { items }, { user }) => {
         validateInput(validationSchemas.weightSummaryBatchItemUpdateForSAP, {
