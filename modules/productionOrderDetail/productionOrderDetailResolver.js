@@ -155,6 +155,20 @@ const validationSchemas = {
     totalWeighedGoodReceive: Joi.number().min(0).optional(),
     weighingCount: Joi.number().integer().min(0).optional(),
   }),
+  productionOrderDetailBatchCreate: Joi.array()
+    .items(
+      Joi.object({
+        productionOrderId: Joi.number().integer().required(),
+        materialCode: Joi.string().required().min(1).max(255),
+        targetWeight: Joi.number().integer().required().min(1),
+        orderTypeId: Joi.number().integer().optional(),
+        totalWeighed: Joi.number().min(0).optional(),
+        totalWeighedGoodReceive: Joi.number().min(0).optional(),
+        weighingCount: Joi.number().integer().min(0).optional(),
+      })
+    )
+    .min(1)
+    .required(),
 };
 
 const validateInput = (schema, data) => {
@@ -804,7 +818,180 @@ module.exports = {
           await transaction.commit();
           return newProductionOrderDetail;
         } catch (err) {
-          await transaction.rollback();
+          if (!transaction.finished) {
+            await transaction.rollback();
+          }
+          throw err;
+        }
+      }
+    ),
+
+    productionOrderDetailBatchCreate: combineResolvers(
+      isAuthenticated,
+      // hasPermission('productionOrderDetail.create'),
+      async (_, { input }, { user }) => {
+        validateInput(
+          validationSchemas.productionOrderDetailBatchCreate,
+          input
+        );
+        const transaction = await ProductionOrderDetail.sequelize.transaction();
+
+        try {
+          // Get unique productionOrderIds and materialCodes from input
+          const productionOrderIds = [
+            ...new Set(input.map((item) => item.productionOrderId)),
+          ];
+          const materialCodes = [
+            ...new Set(input.map((item) => item.materialCode)),
+          ];
+
+          // Validate all productionOrderSAPs exist
+          const productionOrderSAPs = await ProductionOrderSAP.findAll({
+            where: {
+              id: { [Sequelize.Op.in]: productionOrderIds },
+            },
+            attributes: ['id', 'orderTypeCode'],
+            transaction,
+          });
+
+          if (productionOrderSAPs.length !== productionOrderIds.length) {
+            const foundIds = productionOrderSAPs.map((po) => po.id);
+            const missingIds = productionOrderIds.filter(
+              (id) => !foundIds.includes(id)
+            );
+            throw new ApolloError(
+              `Production Order SAP(s) not found: ${missingIds.join(', ')}`,
+              apolloErrorCodes.NOT_FOUND
+            );
+          }
+
+          // Create map of productionOrderId -> productionOrderSAP
+          const productionOrderSAPMap = productionOrderSAPs.reduce(
+            (acc, po) => {
+              acc[po.id] = po;
+              return acc;
+            },
+            {}
+          );
+
+          // Fetch all materials from WMS
+          const materials = await Material.findAll({
+            where: {
+              code: { [Sequelize.Op.in]: materialCodes },
+              clientId: MATERIAL_CLIENT_ID,
+            },
+            include: [
+              {
+                model: MaterialUom,
+                as: 'uom',
+                attributes: ['id', 'clientId', 'code', 'name'],
+                where: { clientId: MATERIAL_CLIENT_ID },
+                required: false,
+              },
+            ],
+            transaction,
+          });
+
+          if (materials.length !== materialCodes.length) {
+            const foundCodes = materials.map((m) => m.code);
+            const missingCodes = materialCodes.filter(
+              (code) => !foundCodes.includes(code)
+            );
+            throw new ApolloError(
+              `Material(s) not found in WMS: ${missingCodes.join(', ')}`,
+              apolloErrorCodes.BAD_DATA_VALIDATION
+            );
+          }
+
+          // Create map of materialCode -> material
+          const materialMap = materials.reduce((acc, material) => {
+            acc[material.code] = material;
+            return acc;
+          }, {});
+
+          // Get all unique orderTypeCodes from productionOrderSAPs
+          const orderTypeCodes = [
+            ...new Set(
+              productionOrderSAPs
+                .map((po) => {
+                  if (po.orderTypeCode) {
+                    const orderTypeCode = po.orderTypeCode;
+                    return orderTypeCode.length >= 2
+                      ? orderTypeCode.slice(-2)
+                      : orderTypeCode;
+                  }
+                  return null;
+                })
+                .filter((code) => code !== null)
+            ),
+          ];
+
+          // Fetch all orderTypes
+          const orderTypes = await OrderType.findAll({
+            where: {
+              code: { [Sequelize.Op.in]: orderTypeCodes },
+            },
+            attributes: ['id', 'code', 'name', 'processType', 'maxDay'],
+            transaction,
+          });
+
+          // Create map of orderTypeCode -> orderType
+          const orderTypeMap = orderTypes.reduce((acc, ot) => {
+            acc[ot.code] = ot;
+            return acc;
+          }, {});
+
+          // Prepare payloads for bulk create
+          const payloadsToCreate = input.map((item) => {
+            const productionOrderSAP =
+              productionOrderSAPMap[item.productionOrderId];
+            const material = materialMap[item.materialCode];
+
+            // Get orderTypeId from orderTypeCode in productionOrderSAP
+            let orderTypeId = null;
+            let processingType = null;
+            if (productionOrderSAP.orderTypeCode) {
+              const orderTypeCode = productionOrderSAP.orderTypeCode;
+              const lastTwoChars =
+                orderTypeCode.length >= 2
+                  ? orderTypeCode.slice(-2)
+                  : orderTypeCode;
+
+              const orderType = orderTypeMap[lastTwoChars];
+              if (orderType) {
+                orderTypeId = orderType.id;
+                processingType = orderType.processType;
+              }
+            }
+
+            return {
+              productionOrderId: item.productionOrderId,
+              materialCode: item.materialCode,
+              materialDescription: material?.name,
+              materialUom: material?.uom?.code,
+              targetWeight: item.targetWeight,
+              processingType: processingType,
+              orderTypeId: orderTypeId,
+              totalWeighed: item.totalWeighed ?? 0,
+              totalWeighedGoodReceive: item.totalWeighedGoodReceive ?? 0,
+              weighingCount: item.weighingCount ?? 0,
+              createdBy: user?.id || null,
+            };
+          });
+
+          // Bulk create all production order details
+          const newProductionOrderDetails =
+            await ProductionOrderDetail.bulkCreate(payloadsToCreate, {
+              transaction,
+              returning: true,
+            });
+
+          await transaction.commit();
+          return newProductionOrderDetails;
+        } catch (err) {
+          if (!transaction.finished) {
+            await transaction.rollback();
+          }
           throw err;
         }
       }

@@ -5,7 +5,7 @@ const {
   PhoneNumberResolver,
 } = require('graphql-scalars');
 
-// const plantResolver = require('./modules/plant/resolver');
+const plantResolver = require('./modules/plant/plantResolver');
 const authResolver = require('./modules/auth/authResolver');
 const scaleResolver = require('./modules/scale/scaleResolver');
 const scaleAssignmentResolver = require('./modules/scaleAssignment/scaleAssignmentResolver');
@@ -33,7 +33,7 @@ module.exports = {
   EmailAddress: EmailAddressResolver,
   PhoneNumber: PhoneNumberResolver,
   Query: {
-    // ...plantResolver.Query,
+    ...plantResolver.Query,
     ...authResolver.Query,
     ...scaleResolver.Query,
     ...productionOrderSAPResolver.Query,
@@ -62,7 +62,6 @@ module.exports = {
     ...productionOrderDetailResolver.ProductionOrderDetail,
   },
   Mutation: {
-    // ...plantResolver.Mutation,
     ...authResolver.Mutation,
     ...scaleResolver.Mutation,
     ...productionOrderSAPResolver.Mutation,

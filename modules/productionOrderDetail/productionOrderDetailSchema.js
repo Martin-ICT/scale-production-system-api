@@ -28,6 +28,9 @@ module.exports = gql`
     productionOrderDetailCreate(
       input: ProductionOrderDetailInputCreate!
     ): ProductionOrderDetail
+    productionOrderDetailBatchCreate(
+      input: [ProductionOrderDetailInputCreate!]!
+    ): [ProductionOrderDetail!]!
     productionOrderDetailUpdate(
       id: ID!
       input: ProductionOrderDetailInputUpdate!
