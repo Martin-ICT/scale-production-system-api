@@ -27,6 +27,9 @@ module.exports = gql`
     weightSummaryBatchDelete(id: ID!): Boolean
     weightSummaryBatchCreateFromScaleResults: [WeightSummaryBatch!]!
     sendWeightSummaryBatchItemToSAP(id: ID!): WeightSummaryBatch
+    """
+    If you intend to perform a split on the weightSummaryBatchItem data, please make sure to include totalWeightForSplit as well.
+    """
     weightSummaryBatchItemUpdate(
       id: ID!
       input: WeightSummaryBatchItemInputUpdate!

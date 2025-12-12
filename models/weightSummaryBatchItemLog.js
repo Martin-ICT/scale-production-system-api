@@ -31,27 +31,14 @@ const WeightSummaryBatchItemLog = sequelize.define(
       },
       comment: 'ID ke weight_summary_batch_item yang menjadi tujuan',
     },
-    totalWeight: {
-      field: 'total_weight',
-      type: DataTypes.DECIMAL(10, 3),
-      allowNull: true,
-      defaultValue: 0,
-      comment: 'Total weight yang dipindahkan',
-    },
-    totalWeightConverted: {
-      field: 'total_weight_converted',
-      type: DataTypes.DECIMAL(10, 3),
-      allowNull: true,
-      defaultValue: 0,
-      comment: 'Total weight converted yang dipindahkan',
+    operation: {
+      field: 'operation',
+      type: DataTypes.ENUM('split', 'merge', 'edit', 'createFromFailed'),
+      allowNull: false,
+      comment: 'Jenis operasi: split, merge, edit, atau createFromFailed',
     },
     createdBy: {
       field: 'created_by',
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
-    updatedBy: {
-      field: 'updated_by',
       type: DataTypes.INTEGER,
       allowNull: true,
     },
@@ -61,22 +48,13 @@ const WeightSummaryBatchItemLog = sequelize.define(
       defaultValue: Sequelize.NOW,
       allowNull: false,
     },
-    updatedAt: {
-      field: 'updated_at',
-      type: DataTypes.DATE,
-      defaultValue: Sequelize.NOW,
-      allowNull: false,
-    },
-    deletedAt: {
-      field: 'deleted_at',
-      type: DataTypes.DATE,
-    },
   },
   {
     freezeTableName: true,
     tableName: 'weight_summary_batch_item_log',
     timestamps: true,
-    paranoid: true,
+    updatedAt: false, // Only createdAt, no updatedAt
+    paranoid: false, // No soft delete
   }
 );
 
@@ -89,10 +67,10 @@ WeightSummaryBatchItemLog.associate = (models) => {
     foreignKey: 'idTo',
     as: 'toItem',
   });
+  WeightSummaryBatchItemLog.hasMany(models.WeightSummaryBatchItemLogDetail, {
+    foreignKey: 'weightSummaryBatchItemLogId',
+    as: 'details',
+  });
 };
 
 module.exports = WeightSummaryBatchItemLog;
-
-
-
-

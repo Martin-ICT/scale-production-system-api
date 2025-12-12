@@ -15,6 +15,7 @@ const definedSearch = require('../../helpers/definedSearch');
 const WeightSummaryBatch = require('../../models/weightSummaryBatch');
 const WeightSummaryBatchItem = require('../../models/weightSummaryBatchItem');
 const WeightSummaryBatchItemLog = require('../../models/weightSummaryBatchItemLog');
+const WeightSummaryBatchItemLogDetail = require('../../models/weightSummaryBatchItemLogDetail');
 const ProductionOrderDetail = require('../../models/productionOrderDetail');
 const ProductionOrderSAP = require('../../models/productionOrderSAP');
 const ScaleResults = require('../../models/scaleResults');
@@ -1510,6 +1511,65 @@ module.exports = {
           await WeightSummaryBatchItem.sequelize.transaction();
 
         try {
+          // Helper function to build group key
+          const groupKeyFields = [
+            'productionOrderNumber',
+            'materialCode',
+            'productionGroup',
+            'productionShift',
+            'packingGroup',
+            'packingShift',
+            'productionLot',
+            'productionLocation',
+            'storageLocation',
+            'storageLocationTarget',
+            'plantCode',
+          ];
+
+          const buildGroupKey = (item) => {
+            return groupKeyFields
+              .map((field) => {
+                const value = item[field];
+                return `${field}:${
+                  value !== null && value !== undefined ? value : 'null'
+                }`;
+              })
+              .join('|');
+          };
+
+          // Helper function to create log detail
+          const createLogDetail = async (
+            logId,
+            itemId,
+            beforeData,
+            afterData,
+            transaction
+          ) => {
+            await WeightSummaryBatchItemLogDetail.create(
+              {
+                weightSummaryBatchItemLogId: logId,
+                weightSummaryBatchItemId: itemId,
+                beforeData: beforeData,
+                afterData: afterData,
+              },
+              { transaction }
+            );
+          };
+
+          // Helper function to convert status for GraphQL
+          const convertStatusForGraphQL = (status) => {
+            const STATUS_MAP = {
+              pending: 'PENDING',
+              success: 'SUCCESS',
+              failed: 'FAILED',
+            };
+            if (status == null) return null;
+            return (
+              STATUS_MAP[String(status).toLowerCase()] ||
+              String(status).toUpperCase()
+            );
+          };
+
           // Find the batch item
           const batchItem = await WeightSummaryBatchItem.findByPk(id, {
             transaction,
@@ -1541,8 +1601,11 @@ module.exports = {
           // Get old values before update
           const oldItem = batchItem.toJSON();
           const oldStatus = oldItem.status || 'pending';
+          const oldTotalWeight = parseFloat(oldItem.totalWeight) || 0;
 
-          // Check status: if 'failed', create new item and log; if 'pending', update directly
+          // ============================================
+          // MECHANISM 1: Handle status 'failed' -> createFromFailed
+          // ============================================
           if (oldStatus === 'failed') {
             // Soft delete the old item
             await batchItem.destroy({ transaction });
@@ -1618,17 +1681,33 @@ module.exports = {
               transaction,
             });
 
-            // Create log entry
-            await WeightSummaryBatchItemLog.create(
+            // Create log entry for createFromFailed
+            const logEntry = await WeightSummaryBatchItemLog.create(
               {
-                idFrom: oldItem.id, // ID of the old (soft deleted) item
-                idTo: newItem.id, // ID of the new item
-                totalWeight: parseFloat(oldItem.totalWeight) || 0,
-                totalWeightConverted:
-                  parseFloat(oldItem.totalWeightConverted) || 0,
+                idFrom: oldItem.id,
+                idTo: newItem.id,
+                operation: 'createFromFailed',
                 createdBy: user?.userId || null,
               },
               { transaction }
+            );
+
+            // Create log detail for old item (beforeData = old data, afterData = null because deleted)
+            await createLogDetail(
+              logEntry.id,
+              oldItem.id,
+              oldItem,
+              null,
+              transaction
+            );
+
+            // Create log detail for new item (beforeData = null, afterData = new data)
+            await createLogDetail(
+              logEntry.id,
+              newItem.id,
+              null,
+              newItem.toJSON(),
+              transaction
             );
 
             // Reload new item with associations
@@ -1642,72 +1721,181 @@ module.exports = {
               transaction,
             });
 
-            // Convert status from database to GraphQL enum format before commit
-            const STATUS_MAP_NEW = {
-              pending: 'PENDING',
-              success: 'SUCCESS',
-              failed: 'FAILED',
-            };
-
             const newItemResponse = newItem.toJSON();
-            if (newItemResponse.status != null) {
-              newItemResponse.status =
-                STATUS_MAP_NEW[String(newItemResponse.status).toLowerCase()] ||
-                newItemResponse.status.toUpperCase();
-            }
+            newItemResponse.status = convertStatusForGraphQL(
+              newItemResponse.status
+            );
 
             await transaction.commit();
-
             return newItemResponse;
           }
 
-          // If status is 'pending', update directly
-          // Prepare update payload
+          // ============================================
+          // MECHANISM 2 & 3: Handle split, merge, or edit
+          // ============================================
+          // Check if split is needed (input.totalWeight is provided and is partial)
+          const inputTotalWeight =
+            input.totalWeight !== undefined
+              ? parseFloat(input.totalWeight)
+              : null;
+          const isSplit =
+            inputTotalWeight !== null &&
+            inputTotalWeight > 0 &&
+            inputTotalWeight < oldTotalWeight;
+
+          // Prepare update payload (merge input with old values)
           const updatePayload = {
             ...input,
             updatedBy: user?.userId || null,
           };
 
-          // Update the item
-          await batchItem.update(updatePayload, { transaction });
+          // If split, update original item with reduced weight
+          if (isSplit) {
+            const splitWeight = inputTotalWeight;
+            const remainingWeight = oldTotalWeight - splitWeight;
+            const oldTotalWeightConverted =
+              parseFloat(oldItem.totalWeightConverted) || 0;
+            const weightRatio = splitWeight / oldTotalWeight;
+            const splitTotalWeightConverted =
+              oldTotalWeightConverted * weightRatio;
+            const remainingTotalWeightConverted =
+              oldTotalWeightConverted - splitTotalWeightConverted;
 
-          // Reload to get updated values
+            // Update original item with remaining weight
+            updatePayload.totalWeight = remainingWeight;
+            updatePayload.totalWeightConverted = remainingTotalWeightConverted;
+
+            // Create new item with split weight
+            const newItemData = {
+              productionOrderNumber:
+                input.productionOrderNumber !== undefined
+                  ? input.productionOrderNumber
+                  : oldItem.productionOrderNumber,
+              plantCode:
+                input.plantCode !== undefined
+                  ? input.plantCode
+                  : oldItem.plantCode,
+              materialCode:
+                input.materialCode !== undefined
+                  ? input.materialCode
+                  : oldItem.materialCode,
+              materialUom:
+                input.materialUom !== undefined
+                  ? input.materialUom
+                  : oldItem.materialUom,
+              totalWeight: splitWeight,
+              totalWeightConverted: splitTotalWeightConverted,
+              productionGroup:
+                input.productionGroup !== undefined
+                  ? input.productionGroup
+                  : oldItem.productionGroup,
+              productionShift:
+                input.productionShift !== undefined
+                  ? input.productionShift
+                  : oldItem.productionShift,
+              packingGroup:
+                input.packingGroup !== undefined
+                  ? input.packingGroup
+                  : oldItem.packingGroup,
+              packingShift:
+                input.packingShift !== undefined
+                  ? input.packingShift
+                  : oldItem.packingShift,
+              productionLot:
+                input.productionLot !== undefined
+                  ? input.productionLot
+                  : oldItem.productionLot,
+              productionLocation:
+                input.productionLocation !== undefined
+                  ? input.productionLocation
+                  : oldItem.productionLocation,
+              storageLocation:
+                input.storageLocation !== undefined
+                  ? input.storageLocation
+                  : oldItem.storageLocation,
+              storageLocationTarget:
+                input.storageLocationTarget !== undefined
+                  ? input.storageLocationTarget
+                  : oldItem.storageLocationTarget,
+              weightSummaryBatchId: batch.id,
+              packingDate:
+                input.packingDate !== undefined
+                  ? input.packingDate
+                  : oldItem.packingDate,
+              status: oldItem.status || 'pending',
+              createdBy: user?.userId || null,
+            };
+
+            const splitItem = await WeightSummaryBatchItem.create(newItemData, {
+              transaction,
+            });
+
+            // Create log entry for split
+            const splitLogEntry = await WeightSummaryBatchItemLog.create(
+              {
+                idFrom: oldItem.id,
+                idTo: splitItem.id,
+                operation: 'split',
+                createdBy: user?.userId || null,
+              },
+              { transaction }
+            );
+
+            // Create log detail for original item (before and after split)
+            await batchItem.update(updatePayload, { transaction });
+            await batchItem.reload({ transaction });
+            const updatedOriginalItem = batchItem.toJSON();
+
+            await createLogDetail(
+              splitLogEntry.id,
+              oldItem.id,
+              oldItem,
+              updatedOriginalItem,
+              transaction
+            );
+
+            // Create log detail for split item
+            await createLogDetail(
+              splitLogEntry.id,
+              splitItem.id,
+              null,
+              splitItem.toJSON(),
+              transaction
+            );
+
+            // Reload split item with associations
+            await splitItem.reload({
+              include: [
+                {
+                  model: WeightSummaryBatch,
+                  as: 'weightSummaryBatch',
+                },
+              ],
+              transaction,
+            });
+
+            const splitItemResponse = splitItem.toJSON();
+            splitItemResponse.status = convertStatusForGraphQL(
+              splitItemResponse.status
+            );
+
+            await transaction.commit();
+            return splitItemResponse;
+          }
+
+          // Update the item first
+          await batchItem.update(updatePayload, { transaction });
           await batchItem.reload({ transaction });
           const updatedItem = batchItem.toJSON();
 
-          // Build grouping key from updated item
-          const groupKeyFields = [
-            'productionOrderNumber',
-            'materialCode',
-            'productionGroup',
-            'productionShift',
-            'packingGroup',
-            'packingShift',
-            'productionLot',
-            'productionLocation',
-            'storageLocation',
-            'storageLocationTarget',
-            'plantCode',
-          ];
-
-          const buildGroupKey = (item) => {
-            return groupKeyFields
-              .map((field) => {
-                const value = item[field];
-                return `${field}:${
-                  value !== null && value !== undefined ? value : 'null'
-                }`;
-              })
-              .join('|');
-          };
-
+          // Check for merge: find items with matching group key (only pending status)
           const updatedGroupKey = buildGroupKey(updatedItem);
 
-          // Find other items in the same batch with the same grouping (excluding current item)
           const duplicateItems = await WeightSummaryBatchItem.findAll({
             where: {
               weightSummaryBatchId: batch.id,
               id: { [Sequelize.Op.ne]: id },
+              status: 'pending',
               deletedAt: null,
             },
             transaction,
@@ -1720,8 +1908,10 @@ module.exports = {
             return itemGroupKey === updatedGroupKey;
           });
 
+          // ============================================
+          // MECHANISM 3: Merge if grouping matches
+          // ============================================
           if (matchingItems.length > 0) {
-            // Merge: Use the first matching item as the target
             const targetItem = matchingItems[0];
             const targetItemData = targetItem.toJSON();
 
@@ -1733,14 +1923,14 @@ module.exports = {
               (parseFloat(targetItemData.totalWeightConverted) || 0) +
               (parseFloat(updatedItem.totalWeightConverted) || 0);
 
-            // Prepare merge payload - use updated values for non-numeric fields if they were provided
+            // Prepare merge payload - use updated values for non-numeric fields
             const mergePayload = {
               totalWeight: newTotalWeight,
               totalWeightConverted: newTotalWeightConverted,
               updatedBy: user?.userId || null,
             };
 
-            // Update non-numeric fields from input if provided (use updated values)
+            // Update non-numeric fields from updated item
             if (input.productionOrderNumber !== undefined) {
               mergePayload.productionOrderNumber =
                 updatedItem.productionOrderNumber;
@@ -1786,10 +1976,41 @@ module.exports = {
             // Update target item with merged data
             await targetItem.update(mergePayload, { transaction });
 
-            // Soft delete the updated item (the one we just updated)
+            // Soft delete the updated item
             await batchItem.destroy({ transaction });
 
-            // Reload target item with associations before commit
+            // Create log entry for merge
+            const mergeLogEntry = await WeightSummaryBatchItemLog.create(
+              {
+                idFrom: oldItem.id,
+                idTo: targetItem.id,
+                operation: 'merge',
+                createdBy: user?.userId || null,
+              },
+              { transaction }
+            );
+
+            // Create log detail for original item (before and after, then deleted)
+            await createLogDetail(
+              mergeLogEntry.id,
+              oldItem.id,
+              oldItem,
+              updatedItem,
+              transaction
+            );
+
+            // Create log detail for target item (before and after merge)
+            await targetItem.reload({ transaction });
+            const mergedTargetItem = targetItem.toJSON();
+            await createLogDetail(
+              mergeLogEntry.id,
+              targetItem.id,
+              targetItemData,
+              mergedTargetItem,
+              transaction
+            );
+
+            // Reload target item with associations
             await targetItem.reload({
               include: [
                 {
@@ -1800,58 +2021,60 @@ module.exports = {
               transaction,
             });
 
-            // Convert status from database to GraphQL enum format before commit
-            const STATUS_MAP_MERGE = {
-              pending: 'PENDING',
-              success: 'SUCCESS',
-              failed: 'FAILED',
-            };
-
             const targetItemResponse = targetItem.toJSON();
-            if (targetItemResponse.status != null) {
-              targetItemResponse.status =
-                STATUS_MAP_MERGE[
-                  String(targetItemResponse.status).toLowerCase()
-                ] || targetItemResponse.status.toUpperCase();
-            }
+            targetItemResponse.status = convertStatusForGraphQL(
+              targetItemResponse.status
+            );
 
             await transaction.commit();
-
             return targetItemResponse;
-          } else {
-            // No duplicate grouping, just return the updated item
-            // Reload with associations before commit
-            await batchItem.reload({
-              include: [
-                {
-                  model: WeightSummaryBatch,
-                  as: 'weightSummaryBatch',
-                },
-              ],
-              transaction,
-            });
-
-            // Convert status from database to GraphQL enum format before commit
-            const STATUS_MAP_UPDATE = {
-              pending: 'PENDING',
-              success: 'SUCCESS',
-              failed: 'FAILED',
-            };
-
-            const batchItemResponse = batchItem.toJSON();
-            if (batchItemResponse.status != null) {
-              batchItemResponse.status =
-                STATUS_MAP_UPDATE[
-                  String(batchItemResponse.status).toLowerCase()
-                ] || batchItemResponse.status.toUpperCase();
-            }
-
-            await transaction.commit();
-
-            return batchItemResponse;
           }
+
+          // ============================================
+          // MECHANISM 4: Edit (no split, no merge)
+          // ============================================
+          // Create log entry for edit
+          const editLogEntry = await WeightSummaryBatchItemLog.create(
+            {
+              idFrom: oldItem.id,
+              idTo: oldItem.id, // Same item, just edited
+              operation: 'edit',
+              createdBy: user?.userId || null,
+            },
+            { transaction }
+          );
+
+          // Create log detail for edited item
+          await createLogDetail(
+            editLogEntry.id,
+            oldItem.id,
+            oldItem,
+            updatedItem,
+            transaction
+          );
+
+          // Reload with associations
+          await batchItem.reload({
+            include: [
+              {
+                model: WeightSummaryBatch,
+                as: 'weightSummaryBatch',
+              },
+            ],
+            transaction,
+          });
+
+          const batchItemResponse = batchItem.toJSON();
+          batchItemResponse.status = convertStatusForGraphQL(
+            batchItemResponse.status
+          );
+
+          await transaction.commit();
+          return batchItemResponse;
         } catch (err) {
-          await transaction.rollback();
+          if (!transaction.finished) {
+            await transaction.rollback();
+          }
           throw err;
         }
       }
