@@ -64,6 +64,9 @@ const attachMaterialToDetails = async (details) => {
     where: {
       code: { [Sequelize.Op.in]: materialCodes },
       clientId: MATERIAL_CLIENT_ID,
+      measurementType: {
+        [Sequelize.Op.ne]: null,
+      },
     },
     include: [
       {
@@ -72,44 +75,18 @@ const attachMaterialToDetails = async (details) => {
         required: false,
         attributes: ['id', 'clientId', 'code', 'name'],
       },
-      {
-        model: MaterialOrderType,
-        as: 'materialOrderTypes',
-        required: false,
-        attributes: ['id', 'minWeight', 'maxWeight'],
-        where: {
-          clientId: MATERIAL_CLIENT_ID,
-        },
-      },
     ],
   });
 
   const materialMap = materials.reduce((acc, material) => {
     const materialData = material.toJSON();
 
-    // Extract minWeight and maxWeight from materialOrderTypes
-    if (
-      materialData.materialOrderTypes &&
-      materialData.materialOrderTypes.length > 0
-    ) {
-      // Get minWeight from first MaterialOrderType that has minWeight
-      const firstWithMinWeight = materialData.materialOrderTypes.find(
-        (mot) => mot.minWeight != null
-      );
-      materialData.minWeight = firstWithMinWeight?.minWeight ?? null;
-
-      // Get maxWeight from first MaterialOrderType that has maxWeight
-      const firstWithMaxWeight = materialData.materialOrderTypes.find(
-        (mot) => mot.maxWeight != null
-      );
-      materialData.maxWeight = firstWithMaxWeight?.maxWeight ?? null;
-    } else {
-      materialData.minWeight = null;
-      materialData.maxWeight = null;
-    }
-
-    // Remove materialOrderTypes from response as we only need minWeight and maxWeight
-    delete materialData.materialOrderTypes;
+    // minWeight and maxWeight are now directly from Material model
+    // Use get() to ensure we get the mapped field values correctly
+    materialData.minWeight =
+      material.get('minWeight') ?? material.get('z_lower') ?? null;
+    materialData.maxWeight =
+      material.get('maxWeight') ?? material.get('z_upper') ?? null;
 
     acc[material.code] = materialData;
     return acc;
@@ -879,6 +856,10 @@ module.exports = {
             where: {
               code: { [Sequelize.Op.in]: materialCodes },
               clientId: MATERIAL_CLIENT_ID,
+              measurementType: {
+                [Sequelize.Op.ne]: null,
+                [Sequelize.Op.in]: ['actual', 'standard'],
+              },
             },
             include: [
               {
@@ -1193,6 +1174,10 @@ module.exports = {
           where: {
             code: productionOrderDetail.materialCode,
             clientId: MATERIAL_CLIENT_ID,
+            measurementType: {
+              [Sequelize.Op.ne]: null,
+              [Sequelize.Op.in]: ['actual', 'standard'],
+            },
           },
           include: [
             {

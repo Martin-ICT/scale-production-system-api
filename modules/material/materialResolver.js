@@ -42,7 +42,6 @@ module.exports = {
             clientId: 1000009, // Always filter by client ID
             measurementType: {
               [Sequelize.Op.ne]: null,
-              [Sequelize.Op.in]: ['actual', 'standard'],
             },
           };
 
