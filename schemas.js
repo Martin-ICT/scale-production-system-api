@@ -34,6 +34,7 @@ module.exports = gql`
   scalar DateTime
   scalar EmailAddress
   scalar PhoneNumber
+  scalar Decimal
   type Query
   type Mutation
   ${authSchema}

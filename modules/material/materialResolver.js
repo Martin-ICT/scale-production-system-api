@@ -40,6 +40,10 @@ module.exports = {
         try {
           let whereClause = {
             clientId: 1000009, // Always filter by client ID
+            measurementType: {
+              [Sequelize.Op.ne]: null,
+              [Sequelize.Op.not]: '',
+            },
           };
 
           if (search) {
@@ -141,8 +145,22 @@ module.exports = {
             where: {
               id: id,
               clientId: 1000009, // Always filter by client ID
+              measurementType: {
+                [Sequelize.Op.ne]: null,
+                [Sequelize.Op.not]: '',
+              },
             },
-            attributes: ['id', 'code', 'name', 'uomId'],
+            attributes: [
+              'id',
+              'clientId',
+              'code',
+              'name',
+              'measurementType',
+              'measurementTypeValue',
+              'minWeight',
+              'maxWeight',
+              'uomId',
+            ],
             include: [
               {
                 model: MaterialUom,
@@ -177,6 +195,10 @@ module.exports = {
         try {
           let whereClause = {
             clientId: 1000009, // Always filter by client ID
+            measurementType: {
+              [Sequelize.Op.ne]: null,
+              [Sequelize.Op.not]: '',
+            },
           };
 
           if (filter?.code) {
@@ -243,6 +265,19 @@ module.exports = {
 
   // Field resolvers
   Material: {
+    measurementType: (material) => {
+      // Convert database lowercase enum to GraphQL uppercase enum
+      const MEASUREMENT_TYPE_MAP = {
+        actual: 'ACTUAL',
+        standard: 'STANDARD',
+      };
+      const dbValue = material.measurementType || material.z_actual_standard;
+      if (!dbValue) return null;
+      return (
+        MEASUREMENT_TYPE_MAP[String(dbValue).toLowerCase()] ||
+        dbValue.toUpperCase()
+      );
+    },
     orderTypes: async (material) => {
       try {
         // Get ALL ElementValues associated with this Material through MaterialOrderType
@@ -275,67 +310,17 @@ module.exports = {
         return [];
       }
     },
-    minWeight: async (material) => {
-      try {
-        // If materialOrderTypes already included in query, use it
-        if (
-          material.materialOrderTypes &&
-          material.materialOrderTypes.length > 0
-        ) {
-          // Get minWeight from first MaterialOrderType that has minWeight
-          const firstWithMinWeight = material.materialOrderTypes.find(
-            (mot) => mot.minWeight != null
-          );
-          return firstWithMinWeight?.minWeight ?? null;
-        }
-
-        // Otherwise, fetch from database
-        const materialOrderType = await MaterialOrderType.findOne({
-          where: {
-            materialId: material.id,
-            clientId: 1000009,
-            minWeight: { [Sequelize.Op.ne]: null },
-          },
-          attributes: ['minWeight'],
-          order: [['id', 'ASC']],
-        });
-
-        return materialOrderType?.minWeight ?? null;
-      } catch (error) {
-        console.error('Error fetching minWeight for Material:', error);
-        return null;
-      }
+    minWeight: (material) => {
+      // Get minWeight directly from Material model
+      return material.minWeight ?? material.z_lower ?? null;
     },
-    maxWeight: async (material) => {
-      try {
-        // If materialOrderTypes already included in query, use it
-        if (
-          material.materialOrderTypes &&
-          material.materialOrderTypes.length > 0
-        ) {
-          // Get maxWeight from first MaterialOrderType that has maxWeight
-          const firstWithMaxWeight = material.materialOrderTypes.find(
-            (mot) => mot.maxWeight != null
-          );
-          return firstWithMaxWeight?.maxWeight ?? null;
-        }
-
-        // Otherwise, fetch from database
-        const materialOrderType = await MaterialOrderType.findOne({
-          where: {
-            materialId: material.id,
-            clientId: 1000009,
-            maxWeight: { [Sequelize.Op.ne]: null },
-          },
-          attributes: ['maxWeight'],
-          order: [['id', 'ASC']],
-        });
-
-        return materialOrderType?.maxWeight ?? null;
-      } catch (error) {
-        console.error('Error fetching maxWeight for Material:', error);
-        return null;
-      }
+    maxWeight: (material) => {
+      // Get maxWeight directly from Material model
+      return material.maxWeight ?? material.z_upper ?? null;
+    },
+    measurementTypeValue: (material) => {
+      // Get measurementTypeValue directly from Material model
+      return material.measurementTypeValue ?? material.z_standard_value ?? null;
     },
   },
 };

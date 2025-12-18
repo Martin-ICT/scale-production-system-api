@@ -52,9 +52,14 @@ const ScaleResults = sequelize.define(
       type: DataTypes.STRING(10),
       allowNull: true,
     },
-    weight_converted: {
+    weightConverted: {
       field: 'weight_converted',
       type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
+    materialMeasurementType: {
+      field: 'material_measurement_type',
+      type: DataTypes.ENUM('actual', 'standard'),
       allowNull: true,
     },
     productionGroup: {

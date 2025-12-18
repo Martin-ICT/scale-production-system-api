@@ -32,6 +32,17 @@ module.exports = {
   JSON: GraphQLJSON,
   EmailAddress: EmailAddressResolver,
   PhoneNumber: PhoneNumberResolver,
+  Decimal: {
+    parseValue: (value) => {
+      return parseFloat(value);
+    },
+    serialize: (value) => {
+      return value ? parseFloat(value) : null;
+    },
+    parseLiteral: (ast) => {
+      return parseFloat(ast.value);
+    },
+  },
   Query: {
     ...plantResolver.Query,
     ...authResolver.Query,

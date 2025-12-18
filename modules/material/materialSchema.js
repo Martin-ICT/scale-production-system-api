@@ -15,14 +15,22 @@ module.exports = gql`
 
   # No Mutation section - Material is read-only from external database
 
+  enum MaterialMeasurementType {
+    ACTUAL
+    STANDARD
+  }
+
   type Material {
     id: ID!
+    clientId: Int
     code: String!
     name: String!
-    uomId: Int!
-    uom: MaterialUom
+    measurementType: MaterialMeasurementType!
+    measurementTypeValue: Decimal!
     minWeight: Float
     maxWeight: Float
+    uomId: Int!
+    uom: MaterialUom
     orderTypes: [ElementValue] # Changed to array
   }
 

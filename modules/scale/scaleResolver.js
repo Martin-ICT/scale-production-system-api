@@ -399,6 +399,8 @@ module.exports = {
                   productionOrderSAP.productionOrderNumber
                 ) {
                   detail.productionOrderSAP = productionOrderSAP;
+                  detail.productionOrderNumber =
+                    productionOrderSAP.productionOrderNumber;
                   return detail;
                 }
                 return null;

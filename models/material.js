@@ -23,6 +23,26 @@ const Material = sequelizeWms.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    measurementType: {
+      field: 'z_actual_standard',
+      type: DataTypes.ENUM('actual', 'standard'),
+      allowNull: false,
+    },
+    measurementTypeValue: {
+      field: 'z_standard_value',
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+    },
+    minWeight: {
+      field: 'z_lower',
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
+    maxWeight: {
+      field: 'z_upper',
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
     uomId: {
       field: 'c_uom_id',
       type: DataTypes.INTEGER,

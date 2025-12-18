@@ -110,11 +110,11 @@ const validateInput = (schema, data) => {
   if (error) joiErrorCallback(error);
 };
 
-// Helper function to map weightConverted to weight_converted and vice versa
+// Helper function to map weightConverted to weightConverted and vice versa
 const mapScaleResultForDB = (input) => {
   const payload = { ...input };
   if (payload.weightConverted !== undefined) {
-    payload.weight_converted = payload.weightConverted;
+    payload.weightConverted = payload.weightConverted;
     delete payload.weightConverted;
   }
   return payload;
@@ -122,9 +122,9 @@ const mapScaleResultForDB = (input) => {
 
 const mapScaleResultForResponse = (result) => {
   const data = result.toJSON ? result.toJSON() : result;
-  if (data.weight_converted !== undefined) {
-    data.weightConverted = data.weight_converted;
-    delete data.weight_converted;
+  if (data.weightConverted !== undefined) {
+    data.weightConverted = data.weightConverted;
+    delete data.weightConverted;
   }
   return data;
 };
@@ -219,7 +219,7 @@ module.exports = {
             offset: page * pageSize,
           });
 
-          // Map weight_converted to weightConverted for GraphQL response
+          // Map weightConverted to weightConverted for GraphQL response
           const scaleResults = result.map(mapScaleResultForResponse);
 
           return {
@@ -289,7 +289,7 @@ module.exports = {
             offset: page * pageSize,
           });
 
-          // Map weight_converted to weightConverted for GraphQL response
+          // Map weightConverted to weightConverted for GraphQL response
           const scaleResults = result.map(mapScaleResultForResponse);
 
           return {
@@ -316,7 +316,7 @@ module.exports = {
         const transaction = await ScaleResults.sequelize.transaction();
 
         try {
-          // Map weightConverted to weight_converted for database
+          // Map weightConverted to weightConverted for database
           const payload = mapScaleResultForDB({
             scaleId: input.scaleId,
             productionOrderNumber: input.productionOrderNumber,
@@ -437,7 +437,7 @@ module.exports = {
 
           await transaction.commit();
 
-          // Map weight_converted back to weightConverted for GraphQL response
+          // Map weightConverted back to weightConverted for GraphQL response
           return newScaleResults.map(mapScaleResultForResponse);
         } catch (err) {
           await transaction.rollback();
@@ -463,7 +463,7 @@ module.exports = {
             );
           }
 
-          // Map weightConverted to weight_converted for database
+          // Map weightConverted to weightConverted for database
           const updatePayload = mapScaleResultForDB(input);
 
           await scaleResult.update(updatePayload, { transaction });
@@ -544,7 +544,7 @@ module.exports = {
           // Get old values for recalculation
           const oldScaleResult = scaleResult.toJSON();
 
-          // Map weightConverted to weight_converted for database
+          // Map weightConverted to weightConverted for database
           const updatePayload = mapScaleResultForDB(input);
 
           // Update scaleResult
@@ -628,7 +628,7 @@ module.exports = {
 
             const totalWeightConverted = groupResults.reduce((sum, r) => {
               const weightConverted =
-                parseFloat(r.weight_converted || r.weightConverted || 0) || 0;
+                parseFloat(r.weightConverted || r.weightConverted || 0) || 0;
               return sum + weightConverted;
             }, 0);
 

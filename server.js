@@ -5,6 +5,9 @@ const resolvers = require('./resolvers');
 const authenticate = require('./middlewares/authenticate');
 const models = require('./models');
 const { Op } = require('sequelize');
+const {
+  startCronJob: startWeightSummaryBatchCronJob,
+} = require('./cronjobs/weightSummaryBatchCreateFromScaleResults');
 
 const server = new ApolloServer({
   typeDefs,
@@ -92,6 +95,9 @@ models.sequelize
     console.log('Database connected and models synced!');
     server.listen(4000, '0.0.0.0').then(({ url }) => {
       console.log(`🚀 Server ready at ${url}`);
+
+      // Start cronjobs
+      startWeightSummaryBatchCronJob();
     });
   })
   .catch((err) => {

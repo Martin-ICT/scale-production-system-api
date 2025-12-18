@@ -80,4 +80,3 @@ WeightSummaryBatchItemLogDetail.associate = (models) => {
 };
 
 module.exports = WeightSummaryBatchItemLogDetail;
-

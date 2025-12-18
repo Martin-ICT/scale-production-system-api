@@ -20,6 +20,7 @@ const ProductionOrderDetail = require('../../models/productionOrderDetail');
 const ProductionOrderSAP = require('../../models/productionOrderSAP');
 const ScaleResults = require('../../models/scaleResults');
 const OrderType = require('../../models/orderType');
+const Material = require('../../models/material');
 const hasPermission = require('../../middlewares/hasPermission');
 const isAuthenticated = require('../../middlewares/isAuthenticated');
 
@@ -696,8 +697,6 @@ module.exports = {
               transaction,
             });
 
-            console.log('MASUK GILA 1');
-
             if (processedBatch) {
               continue;
             }
@@ -715,17 +714,88 @@ module.exports = {
               return sum + (parseFloat(r.weight) || 0);
             }, 0);
 
-            const totalWeightConverted = groupResults.reduce((sum, r) => {
-              const weightConverted =
-                parseFloat(r.weight_converted || r.weightConverted || 0) || 0;
-              return sum + weightConverted;
-            }, 0);
+            // Fetch Material to check measurementType
+            const material = await Material.findOne({
+              where: {
+                code: materialCode,
+                clientId: 1000009, // Default client ID
+              },
+              attributes: ['measurementType', 'measurementTypeValue'],
+              transaction,
+            });
+
+            // Calculate totalWeightConverted based on measurementType and update scaleResults
+            let totalWeightConverted = 0;
+            let materialMeasurementType = null;
+
+            if (material) {
+              materialMeasurementType =
+                material.measurementType || material.z_actual_standard;
+              const measurementTypeValue = parseFloat(
+                material.measurementTypeValue || material.z_standard_value || 0
+              );
+
+              // Update each scale result with materialMeasurementType and weightConverted
+              const scaleResultUpdates = [];
+              for (const result of groupResults) {
+                let weightConverted = 0;
+
+                if (materialMeasurementType === 'actual') {
+                  // If actual: weightConverted = weight (same value)
+                  weightConverted = parseFloat(result.weight) || 0;
+                } else if (materialMeasurementType === 'standard') {
+                  // If standard: weightConverted = measurementTypeValue (fixed value)
+                  weightConverted = measurementTypeValue;
+                } else {
+                  // Fallback: use existing weightConverted if available, otherwise use weight
+                  weightConverted =
+                    parseFloat(
+                      result.weightConverted || result.weight_converted || 0
+                    ) ||
+                    parseFloat(result.weight) ||
+                    0;
+                }
+
+                totalWeightConverted += weightConverted;
+
+                // Prepare update for this scale result
+                scaleResultUpdates.push({
+                  id: result.id,
+                  weightConverted: weightConverted,
+                  materialMeasurementType: materialMeasurementType,
+                });
+              }
+
+              // Bulk update scale results with materialMeasurementType and weightConverted
+              if (scaleResultUpdates.length > 0) {
+                await Promise.all(
+                  scaleResultUpdates.map((update) =>
+                    ScaleResults.update(
+                      {
+                        weightConverted: update.weightConverted,
+                        materialMeasurementType: update.materialMeasurementType,
+                      },
+                      {
+                        where: { id: update.id },
+                        transaction,
+                      }
+                    )
+                  )
+                );
+              }
+            } else {
+              // If material not found, use existing weightConverted or fallback to weight
+              totalWeightConverted = groupResults.reduce((sum, r) => {
+                const weightConverted =
+                  parseFloat(r.weightConverted || r.weight_converted || 0) || 0;
+                return sum + (weightConverted || parseFloat(r.weight) || 0);
+              }, 0);
+            }
 
             const batchKey = `${materialCode}|${searchProductionOrderNumber}|${productionOrderDetail.id}`;
             let existingBatch = batchMap.get(batchKey);
 
             if (!existingBatch) {
-              console.log('MASUK GILA 1');
               const existingDbBatch = await WeightSummaryBatch.findOne({
                 where: {
                   productionOrderDetailId: productionOrderDetail.id,
@@ -752,7 +822,6 @@ module.exports = {
                   existingBatch.scaleResultIdTo = newScaleResultIdTo;
                 }
               } else {
-                console.log('MASUK GILA');
                 const batchPayload = {
                   scaleResultIdFrom,
                   scaleResultIdTo,
@@ -1312,7 +1381,8 @@ module.exports = {
                 AUSP_PACKSHIFT: item.packingShift?.toString() || '',
                 AUSP_PRODLINE: '',
                 AUSP_PACKLINE: '',
-                KEY_STATUS: '0', //ada soft delete masuk
+                //IMPORTANT UNTUK KE BUTUHAN TGL 2 JANUARY DI UBAH JADI "9" , harus nya "0"
+                KEY_STATUS: '9', //ada soft delete masuk
                 INSERT_TIME: formatDateTimeForSAP(),
                 UPDATE_TIME: formatDateTimeForSAP(),
               };
