@@ -42,7 +42,7 @@ module.exports = {
             clientId: 1000009, // Always filter by client ID
             measurementType: {
               [Sequelize.Op.ne]: null,
-              [Sequelize.Op.not]: '',
+              [Sequelize.Op.in]: ['actual', 'standard'],
             },
           };
 
@@ -147,7 +147,7 @@ module.exports = {
               clientId: 1000009, // Always filter by client ID
               measurementType: {
                 [Sequelize.Op.ne]: null,
-                [Sequelize.Op.not]: '',
+                [Sequelize.Op.in]: ['actual', 'standard'],
               },
             },
             attributes: [
@@ -197,7 +197,7 @@ module.exports = {
             clientId: 1000009, // Always filter by client ID
             measurementType: {
               [Sequelize.Op.ne]: null,
-              [Sequelize.Op.not]: '',
+              [Sequelize.Op.in]: ['actual', 'standard'],
             },
           };
 
@@ -272,11 +272,16 @@ module.exports = {
         standard: 'STANDARD',
       };
       const dbValue = material.measurementType || material.z_actual_standard;
-      if (!dbValue) return null;
-      return (
-        MEASUREMENT_TYPE_MAP[String(dbValue).toLowerCase()] ||
-        dbValue.toUpperCase()
-      );
+      if (!dbValue) {
+        // Return null if not found (field is nullable)
+        return null;
+      }
+      const mappedValue = MEASUREMENT_TYPE_MAP[String(dbValue).toLowerCase()];
+      if (!mappedValue) {
+        // If value doesn't match expected enum, return null
+        return null;
+      }
+      return mappedValue;
     },
     orderTypes: async (material) => {
       try {

@@ -25,8 +25,8 @@ module.exports = gql`
     clientId: Int
     code: String!
     name: String!
-    measurementType: MaterialMeasurementType!
-    measurementTypeValue: Decimal!
+    measurementType: MaterialMeasurementType
+    measurementTypeValue: Decimal
     minWeight: Float
     maxWeight: Float
     uomId: Int!
