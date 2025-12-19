@@ -1684,6 +1684,36 @@ module.exports = {
           const oldItem = batchItem.toJSON();
           const oldStatus = oldItem.status || 'pending';
           const oldTotalWeight = parseFloat(oldItem.totalWeight) || 0;
+          const oldTotalWeightConverted =
+            parseFloat(oldItem.totalWeightConverted) || 0;
+
+          // Validate totalWeightConverted input
+          // Only totalWeightConverted can be changed, totalWeight will follow proportionally
+          if (input.totalWeightConverted !== undefined) {
+            const inputTotalWeightConvertedValue = parseFloat(
+              input.totalWeightConverted
+            );
+
+            if (inputTotalWeightConvertedValue <= 0) {
+              throw new ApolloError(
+                `Total weight converted must be greater than 0`,
+                apolloErrorCodes.BAD_DATA_VALIDATION
+              );
+            }
+
+            if (inputTotalWeightConvertedValue > oldTotalWeightConverted) {
+              throw new ApolloError(
+                `Total weight converted (${input.totalWeightConverted}) cannot exceed current total weight converted (${oldTotalWeightConverted})`,
+                apolloErrorCodes.BAD_DATA_VALIDATION
+              );
+            }
+          }
+
+          // If totalWeight is provided in input, ignore it (we calculate from totalWeightConverted)
+          // Remove totalWeight from input to prevent direct modification
+          if (input.totalWeight !== undefined) {
+            delete input.totalWeight;
+          }
 
           // ============================================
           // MECHANISM 1: Handle status 'failed' -> createFromFailed
@@ -1691,6 +1721,21 @@ module.exports = {
           if (oldStatus === 'failed') {
             // Soft delete the old item
             await batchItem.destroy({ transaction });
+
+            // Calculate totalWeight from totalWeightConverted if provided
+            let newTotalWeight = oldItem.totalWeight;
+            let newTotalWeightConverted =
+              input.totalWeightConverted !== undefined
+                ? input.totalWeightConverted
+                : oldItem.totalWeightConverted;
+
+            if (input.totalWeightConverted !== undefined) {
+              // Calculate totalWeight proportionally from totalWeightConverted
+              const weightRatio =
+                parseFloat(input.totalWeightConverted) /
+                oldTotalWeightConverted;
+              newTotalWeight = oldTotalWeight * weightRatio;
+            }
 
             // Create new item with updated data
             const newItemData = {
@@ -1710,14 +1755,8 @@ module.exports = {
                 input.materialUom !== undefined
                   ? input.materialUom
                   : oldItem.materialUom,
-              totalWeight:
-                input.totalWeight !== undefined
-                  ? input.totalWeight
-                  : oldItem.totalWeight,
-              totalWeightConverted:
-                input.totalWeightConverted !== undefined
-                  ? input.totalWeightConverted
-                  : oldItem.totalWeightConverted,
+              totalWeight: newTotalWeight, // Calculated proportionally from totalWeightConverted
+              totalWeightConverted: newTotalWeightConverted,
               productionGroup:
                 input.productionGroup !== undefined
                   ? input.productionGroup
@@ -1815,36 +1854,40 @@ module.exports = {
           // ============================================
           // MECHANISM 2 & 3: Handle split, merge, or edit
           // ============================================
-          // Check if split is needed (input.totalWeight is provided and is partial)
-          const inputTotalWeight =
-            input.totalWeight !== undefined
-              ? parseFloat(input.totalWeight)
+          // Check if split is needed (input.totalWeightConverted is provided and is partial)
+          const inputTotalWeightConverted =
+            input.totalWeightConverted !== undefined
+              ? parseFloat(input.totalWeightConverted)
               : null;
           const isSplit =
-            inputTotalWeight !== null &&
-            inputTotalWeight > 0 &&
-            inputTotalWeight < oldTotalWeight;
+            inputTotalWeightConverted !== null &&
+            inputTotalWeightConverted > 0 &&
+            inputTotalWeightConverted < oldTotalWeightConverted;
 
-          // Prepare update payload (merge input with old values)
+          // Prepare update payload (merge input with old values, but remove totalWeight)
           const updatePayload = {
             ...input,
             updatedBy: user?.userId || null,
           };
+          // Remove totalWeight from payload, we'll calculate it from totalWeightConverted
+          delete updatePayload.totalWeight;
 
           // If split, update original item with reduced weight
           if (isSplit) {
-            const splitWeight = inputTotalWeight;
-            const remainingWeight = oldTotalWeight - splitWeight;
-            const oldTotalWeightConverted =
-              parseFloat(oldItem.totalWeightConverted) || 0;
-            const weightRatio = splitWeight / oldTotalWeight;
-            const splitTotalWeightConverted =
-              oldTotalWeightConverted * weightRatio;
+            const splitTotalWeightConverted = inputTotalWeightConverted;
             const remainingTotalWeightConverted =
               oldTotalWeightConverted - splitTotalWeightConverted;
 
-            // Update original item with remaining weight
-            updatePayload.totalWeight = remainingWeight;
+            // Calculate weight ratio based on totalWeightConverted
+            const weightRatio =
+              splitTotalWeightConverted / oldTotalWeightConverted;
+            const splitTotalWeight = oldTotalWeight * weightRatio;
+            const remainingTotalWeight = oldTotalWeight - splitTotalWeight;
+
+            // Update original item with remaining weight (calculated from remaining converted)
+            const remainingRatio =
+              remainingTotalWeightConverted / oldTotalWeightConverted;
+            updatePayload.totalWeight = oldTotalWeight * remainingRatio;
             updatePayload.totalWeightConverted = remainingTotalWeightConverted;
 
             // Create new item with split weight
@@ -1865,7 +1908,7 @@ module.exports = {
                 input.materialUom !== undefined
                   ? input.materialUom
                   : oldItem.materialUom,
-              totalWeight: splitWeight,
+              totalWeight: splitTotalWeight, // Calculated proportionally from splitTotalWeightConverted
               totalWeightConverted: splitTotalWeightConverted,
               productionGroup:
                 input.productionGroup !== undefined
@@ -1963,6 +2006,17 @@ module.exports = {
 
             await transaction.commit();
             return splitItemResponse;
+          }
+
+          // Calculate totalWeight from totalWeightConverted if totalWeightConverted is provided
+          if (input.totalWeightConverted !== undefined) {
+            const newTotalWeightConverted = parseFloat(
+              input.totalWeightConverted
+            );
+            // Calculate proportional totalWeight
+            const weightRatio =
+              newTotalWeightConverted / oldTotalWeightConverted;
+            updatePayload.totalWeight = oldTotalWeight * weightRatio;
           }
 
           // Update the item first
