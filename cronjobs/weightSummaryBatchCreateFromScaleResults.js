@@ -170,13 +170,13 @@ const createWeightSummaryBatchFromScaleResults = async () => {
       }, 0);
 
       // Fetch Material to check measurementType
+      // Note: Material is in WMS database, so don't use transaction from main database
       const material = await Material.findOne({
         where: {
           code: materialCode,
           clientId: 1000009, // Default client ID
         },
         attributes: ['measurementType', 'measurementTypeValue'],
-        transaction,
       });
 
       // Calculate totalWeightConverted based on measurementType and update scaleResults
@@ -184,7 +184,11 @@ const createWeightSummaryBatchFromScaleResults = async () => {
       let materialMeasurementType = null;
 
       if (material) {
-        materialMeasurementType = material.measurementType;
+        // Ensure measurementType is lowercase for enum compatibility
+        const rawMeasurementType = material.measurementType;
+        materialMeasurementType = rawMeasurementType
+          ? String(rawMeasurementType).toLowerCase()
+          : null;
         const measurementTypeValue = parseFloat(material.measurementTypeValue);
 
         // Update each scale result with materialMeasurementType and weightConverted
@@ -211,10 +215,18 @@ const createWeightSummaryBatchFromScaleResults = async () => {
           totalWeightConverted += weightConverted;
 
           // Prepare update for this scale result
+          // Ensure materialMeasurementType is lowercase and valid enum value
+          const validMeasurementType =
+            materialMeasurementType &&
+            (materialMeasurementType.toLowerCase() === 'actual' ||
+              materialMeasurementType.toLowerCase() === 'standard')
+              ? materialMeasurementType.toLowerCase()
+              : null;
+
           scaleResultUpdates.push({
             id: result.id,
             weightConverted: weightConverted,
-            materialMeasurementType: materialMeasurementType,
+            materialMeasurementType: validMeasurementType,
           });
         }
 

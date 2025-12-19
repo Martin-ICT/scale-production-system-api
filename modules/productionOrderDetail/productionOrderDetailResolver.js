@@ -82,11 +82,31 @@ const attachMaterialToDetails = async (details) => {
     const materialData = material.toJSON();
 
     // minWeight and maxWeight are now directly from Material model
-    // Use get() to ensure we get the mapped field values correctly
+    // Field mapping: minWeight -> z_lower, maxWeight -> z_upper
+    // Sequelize automatically maps these fields, so materialData should already have them
+    // But we ensure they're set correctly from the model instance
     materialData.minWeight =
       material.get('minWeight') ?? material.get('z_lower') ?? null;
     materialData.maxWeight =
       material.get('maxWeight') ?? material.get('z_upper') ?? null;
+
+    // Convert to number if not null
+    if (
+      materialData.minWeight !== null &&
+      materialData.minWeight !== undefined
+    ) {
+      materialData.minWeight = parseFloat(materialData.minWeight);
+    } else {
+      materialData.minWeight = null;
+    }
+    if (
+      materialData.maxWeight !== null &&
+      materialData.maxWeight !== undefined
+    ) {
+      materialData.maxWeight = parseFloat(materialData.maxWeight);
+    } else {
+      materialData.maxWeight = null;
+    }
 
     acc[material.code] = materialData;
     return acc;
@@ -1189,7 +1209,25 @@ module.exports = {
           ],
         });
 
-        return material ? material.toJSON() : null;
+        if (!material) {
+          return null;
+        }
+
+        const materialData = material.toJSON();
+        // Ensure minWeight and maxWeight are loaded correctly
+        const rawData = material.dataValues || material;
+        materialData.minWeight = rawData.minWeight ?? rawData.z_lower ?? null;
+        materialData.maxWeight = rawData.maxWeight ?? rawData.z_upper ?? null;
+
+        // Convert to number if not null
+        if (materialData.minWeight !== null) {
+          materialData.minWeight = parseFloat(materialData.minWeight);
+        }
+        if (materialData.maxWeight !== null) {
+          materialData.maxWeight = parseFloat(materialData.maxWeight);
+        }
+
+        return materialData;
       } catch (error) {
         console.error(
           'Error fetching material for ProductionOrderDetail:',

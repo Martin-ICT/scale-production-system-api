@@ -715,13 +715,13 @@ module.exports = {
             }, 0);
 
             // Fetch Material to check measurementType
+            // Note: Material is in WMS database, so don't use transaction from main database
             const material = await Material.findOne({
               where: {
                 code: materialCode,
                 clientId: 1000009, // Default client ID
               },
               attributes: ['measurementType', 'measurementTypeValue'],
-              transaction,
             });
 
             // Calculate totalWeightConverted based on measurementType and update scaleResults
@@ -729,8 +729,12 @@ module.exports = {
             let materialMeasurementType = null;
 
             if (material) {
-              materialMeasurementType =
+              // Ensure measurementType is lowercase for enum compatibility
+              const rawMeasurementType =
                 material.measurementType || material.z_actual_standard;
+              materialMeasurementType = rawMeasurementType
+                ? String(rawMeasurementType).toLowerCase()
+                : null;
               const measurementTypeValue = parseFloat(
                 material.measurementTypeValue || material.z_standard_value || 0
               );
@@ -759,10 +763,18 @@ module.exports = {
                 totalWeightConverted += weightConverted;
 
                 // Prepare update for this scale result
+                // Ensure materialMeasurementType is lowercase and valid enum value
+                const validMeasurementType =
+                  materialMeasurementType &&
+                  (materialMeasurementType.toLowerCase() === 'actual' ||
+                    materialMeasurementType.toLowerCase() === 'standard')
+                    ? materialMeasurementType.toLowerCase()
+                    : null;
+
                 scaleResultUpdates.push({
                   id: result.id,
                   weightConverted: weightConverted,
-                  materialMeasurementType: materialMeasurementType,
+                  materialMeasurementType: validMeasurementType,
                 });
               }
 
