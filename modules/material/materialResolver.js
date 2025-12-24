@@ -43,6 +43,13 @@ module.exports = {
             measurementType: {
               [Sequelize.Op.ne]: null,
             },
+            // Only show materials that have both minWeight and maxWeight
+            z_lower: {
+              [Sequelize.Op.ne]: null,
+            },
+            z_upper: {
+              [Sequelize.Op.ne]: null,
+            },
           };
 
           if (search) {

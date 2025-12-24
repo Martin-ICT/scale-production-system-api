@@ -1373,7 +1373,7 @@ module.exports = {
                   .substring(0, 19),
                 MSEG_MATNR: item.materialCode || '',
                 MSEG_MENGE: parseFloat(item.totalWeight) || 0,
-                MSEG_ERFME: item.materialUom || 'KG',
+                MSEG_ERFME: 'KG',
                 MSEG_CONVMENGE: parseFloat(item.totalWeightConverted) || 0,
                 MSEG_MEINS: item.materialUom || 'KG',
                 MSEG_LGORT: item.storageLocation || '',
@@ -1874,6 +1874,11 @@ module.exports = {
 
           // If split, update original item with reduced weight
           if (isSplit) {
+            // When splitting, original item should keep its original storageLocationTarget
+            // Only the split item can have a different storageLocationTarget if provided in input
+            if (input.storageLocationTarget !== undefined) {
+              delete updatePayload.storageLocationTarget;
+            }
             const splitTotalWeightConverted = inputTotalWeightConverted;
             const remainingTotalWeightConverted =
               oldTotalWeightConverted - splitTotalWeightConverted;

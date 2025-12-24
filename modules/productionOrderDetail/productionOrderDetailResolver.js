@@ -767,6 +767,24 @@ module.exports = {
             );
           }
 
+          // Check if material already exists for this production order
+          const existingProductionOrderDetail =
+            await ProductionOrderDetail.findOne({
+              where: {
+                productionOrderId: input.productionOrderId,
+                materialCode: input.materialCode,
+                deletedAt: null,
+              },
+              transaction,
+            });
+
+          if (existingProductionOrderDetail) {
+            throw new ApolloError(
+              `Material with code '${input.materialCode}' already exists for this production order`,
+              apolloErrorCodes.BAD_DATA_VALIDATION
+            );
+          }
+
           // Get orderTypeId from orderTypeCode in productionOrderSAP
           // Take only last 2 characters from orderTypeCode
           let orderTypeId = null;
@@ -941,6 +959,52 @@ module.exports = {
             acc[ot.code] = ot;
             return acc;
           }, {});
+
+          // Check for duplicate materials within the batch input
+          const materialCodeCounts = {};
+          input.forEach((item) => {
+            const key = `${item.productionOrderId}-${item.materialCode}`;
+            materialCodeCounts[key] = (materialCodeCounts[key] || 0) + 1;
+          });
+
+          const duplicateInBatch = Object.entries(materialCodeCounts).filter(
+            ([_, count]) => count > 1
+          );
+
+          if (duplicateInBatch.length > 0) {
+            const duplicateKeys = duplicateInBatch.map(([key]) => key);
+            throw new ApolloError(
+              `Duplicate materials found in batch input: ${duplicateKeys.join(
+                ', '
+              )}`,
+              apolloErrorCodes.BAD_DATA_VALIDATION
+            );
+          }
+
+          // Check for duplicate materials with existing data in database
+          const existingProductionOrderDetails =
+            await ProductionOrderDetail.findAll({
+              where: {
+                productionOrderId: { [Sequelize.Op.in]: productionOrderIds },
+                materialCode: { [Sequelize.Op.in]: materialCodes },
+                deletedAt: null,
+              },
+              attributes: ['productionOrderId', 'materialCode'],
+              transaction,
+            });
+
+          if (existingProductionOrderDetails.length > 0) {
+            const duplicateMaterials = existingProductionOrderDetails.map(
+              (pod) =>
+                `PO ${pod.productionOrderId} - Material ${pod.materialCode}`
+            );
+            throw new ApolloError(
+              `Material(s) already exist for production order(s): ${duplicateMaterials.join(
+                ', '
+              )}`,
+              apolloErrorCodes.BAD_DATA_VALIDATION
+            );
+          }
 
           // Prepare payloads for bulk create
           const payloadsToCreate = input.map((item) => {
