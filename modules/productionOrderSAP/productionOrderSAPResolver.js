@@ -1,7 +1,9 @@
+require('dotenv').config();
 const { ApolloError } = require('apollo-server');
 const { combineResolvers } = require('graphql-resolvers');
 const Joi = require('joi');
 const { Sequelize, where } = require('sequelize');
+const axios = require('axios');
 const apolloErrorCodes = require('../../constants/apolloErrorCodes');
 const pageMinCheckAndPageSizeMax = require('../../middlewares/pageMinCheckAndPageSizeMax');
 const { joiErrorCallback } = require('../../helpers/errorHelper');
@@ -60,6 +62,48 @@ const throwSimpleError = (
     };
   }
   throw error;
+};
+
+// Helper function to get SAP API configuration based on environment
+const getSAPUpdatePOConfig = () => {
+  const env = process.env.NODE_ENV || 'development';
+
+  // Determine which environment config to use
+  let url, user, password, client;
+
+  if (env === 'production' || process.env.SAP_ENV === 'prod') {
+    // Production environment
+    url =
+      process.env.SAP_UPDATE_PO_URL_PROD ||
+      'http://10.1.10.16:8000/sap/bc/zws/';
+    user = process.env.SAP_UPDATE_PO_USER_PROD || 'auto';
+    password = process.env.SAP_UPDATE_PO_PASSWORD_PROD || 'initial';
+    client = process.env.SAP_UPDATE_PO_CLIENT_PROD || '160';
+  } else if (env === 'qa' || process.env.SAP_ENV === 'qa') {
+    // QA environment
+    url =
+      process.env.SAP_UPDATE_PO_URL_QA ||
+      'http://10.204.10.15:8001/sap/bc/zws/';
+    user = process.env.SAP_UPDATE_PO_USER_QA || 'auto';
+    password = process.env.SAP_UPDATE_PO_PASSWORD_QA || 'initial';
+    client = process.env.SAP_UPDATE_PO_CLIENT_QA || '462';
+  } else {
+    // Development environment (default)
+    url =
+      process.env.SAP_UPDATE_PO_URL_DEV ||
+      'http://10.204.10.15:8000/sap/bc/zws/';
+    user = process.env.SAP_UPDATE_PO_USER_DEV || 'auto_ws';
+    password = process.env.SAP_UPDATE_PO_PASSWORD_DEV || 'initial';
+    client = process.env.SAP_UPDATE_PO_CLIENT_DEV || '363';
+  }
+
+  // Append endpoint if not already included
+  const endpoint = 'zfmws_update_zppcpfint_uppo';
+  if (!url.endsWith(endpoint)) {
+    url = url.endsWith('/') ? `${url}${endpoint}` : `${url}/${endpoint}`;
+  }
+
+  return { url, user, password, client };
 };
 
 // Helper function to fetch productionLocation (ElementValue) based on plantCode
@@ -190,7 +234,12 @@ module.exports = {
           }
 
           if (filter?.status !== undefined) {
-            whereClause.status = filter.status;
+            if (filter.status === 'active') {
+              whereClause.status = { [Sequelize.Op.in]: [1, 2] };
+            }
+            if (filter.status === 'inactive') {
+              whereClause.status = { [Sequelize.Op.in]: [3] };
+            }
           }
 
           // Handle date range filter using DateFilter (general name for reusability)
@@ -656,12 +705,74 @@ module.exports = {
             );
           }
 
-          await productionOrderSAP.update({ status }, { transaction });
+          // Get old status before update
+          // const oldStatus = productionOrderSAP.status;
 
+          // Update status in database
+          await productionOrderSAP.update({ status }, { transaction });
           await transaction.commit();
+
+          try {
+            const sapConfig = getSAPUpdatePOConfig();
+
+            // Prepare SAP request body
+            const sapRequestBody = {
+              DATA: [
+                {
+                  CAUFV_AUFNR: productionOrderNumber,
+                  KEY_STATUS: status,
+                },
+              ],
+            };
+
+            // Call SAP API
+            const sapResponse = await axios.post(
+              sapConfig.url,
+              sapRequestBody,
+              {
+                headers: {
+                  'sap-user': sapConfig.user,
+                  'sap-password': sapConfig.password,
+                  'sap-client': sapConfig.client,
+                  'Content-Type': 'application/json',
+                },
+                timeout: 30000, // 30 seconds timeout
+              }
+            );
+
+            // Log success (optional - can be removed if not needed)
+            if (sapResponse.status >= 200 && sapResponse.status < 300) {
+              console.log(
+                `✅ Successfully updated PO status in SAP: ${productionOrderNumber}`
+              );
+            }
+          } catch (sapError) {
+            // Log SAP API error but don't fail the mutation
+            // The status update in database has already been committed
+            console.error('❌ SAP API Error when updating PO status:', {
+              productionOrderNumber,
+              error: sapError.message,
+              response: sapError.response?.data,
+              statusCode: sapError.response?.status,
+            });
+
+            // Optionally, you can throw error here if you want to fail the mutation
+            // For now, we'll just log the error and continue
+            // throw new ApolloError(
+            //   `SAP API Error: ${sapError.response?.data?.message || sapError.message || 'Failed to update status in SAP'}`,
+            //   apolloErrorCodes.INTERNAL_SERVER_ERROR,
+            //   {
+            //     sapResponse: sapError.response?.data,
+            //     statusCode: sapError.response?.status,
+            //   }
+            // );
+          }
+
           return productionOrderSAP;
         } catch (err) {
-          await transaction.rollback();
+          if (!transaction.finished) {
+            await transaction.rollback();
+          }
           throw err;
         }
       }

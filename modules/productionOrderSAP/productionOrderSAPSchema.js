@@ -72,7 +72,7 @@ module.exports = gql`
     plantCode: String
     materialCode: String
     orderTypeCode: String
-    status: Int
+    status: String
     scaleId: ID
     date: DateFilter
   }

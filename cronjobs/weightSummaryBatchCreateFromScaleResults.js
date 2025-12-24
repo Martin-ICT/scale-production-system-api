@@ -557,7 +557,7 @@ const startCronJob = () => {
   );
 
   cron.schedule(
-    '*/5 * * * *',
+    '*/1 * * * *',
     async () => {
       try {
         await createWeightSummaryBatchFromScaleResults();
