@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: '.env.qa' });
 const { ApolloServer, ApolloError } = require('apollo-server');
 const typeDefs = require('./schemas');
 const resolvers = require('./resolvers');
