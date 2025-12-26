@@ -83,6 +83,7 @@ const convertCustomFormatToDate = (customFormat) => {
 
 /**
  * Format current date/time to SAP API format: YYYY-MM-DD HH:mm:ss.SSS
+ * Uses Asia/Jakarta timezone (WIB, UTC+7)
  *
  * Example: "2025-12-04 15:08:45.123"
  *
@@ -91,13 +92,37 @@ const convertCustomFormatToDate = (customFormat) => {
  */
 const formatDateTimeForSAP = (date = null) => {
   const now = date || new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
-  const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
+
+  // Format in Asia/Jakarta timezone (WIB, UTC+7)
+  const options = {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  };
+
+  const formatter = new Intl.DateTimeFormat('en-CA', options);
+  const parts = formatter.formatToParts(now);
+
+  const getPart = (type) => parts.find((p) => p.type === type)?.value || '00';
+
+  const year = getPart('year');
+  const month = getPart('month');
+  const day = getPart('day');
+  const hours = getPart('hour');
+  const minutes = getPart('minute');
+  const seconds = getPart('second');
+
+  // Get milliseconds in Jakarta timezone
+  const jakartaOffset = 7 * 60 * 60 * 1000; // UTC+7 in milliseconds
+  const utcTime = now.getTime() + now.getTimezoneOffset() * 60 * 1000;
+  const jakartaTime = new Date(utcTime + jakartaOffset);
+  const milliseconds = String(jakartaTime.getMilliseconds()).padStart(3, '0');
+
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
 };
 
