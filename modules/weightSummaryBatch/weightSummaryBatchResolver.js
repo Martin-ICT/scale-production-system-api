@@ -55,6 +55,18 @@ const SEND_TO_SAP_MAP = {
   success: 'SUCCESS',
 };
 
+// Mapping for WeightSummaryBatchItem status
+const BATCH_ITEM_STATUS_MAP = {
+  // GraphQL -> Database
+  PENDING: 'pending',
+  SUCCESS: 'success',
+  FAILED: 'failed',
+  // Database -> GraphQL
+  pending: 'PENDING',
+  success: 'SUCCESS',
+  failed: 'FAILED',
+};
+
 // Local helper to generate Batch ID (mirrors logic in model)
 const generateBatchIdForPlant = async (plantCode, transaction) => {
   const today = new Date();
@@ -277,6 +289,11 @@ module.exports = {
                     as: 'productionOrderSAP',
                     required: false,
                   },
+                  {
+                    model: OrderType,
+                    as: 'orderType',
+                    required: false,
+                  },
                 ],
               },
               {
@@ -302,6 +319,23 @@ module.exports = {
             ) {
               batchData.productionOrderNumber =
                 batchData.productionOrderDetail.productionOrderSAP.productionOrderNumber;
+            }
+            // Add orderType from nested productionOrderDetail
+            if (batchData.productionOrderDetail?.orderType) {
+              batchData.orderType = batchData.productionOrderDetail.orderType;
+            }
+            // Convert WeightSummaryBatchItem status to GraphQL enum format
+            if (batchData.WeightSummaryBatchItems) {
+              batchData.WeightSummaryBatchItems =
+                batchData.WeightSummaryBatchItems.map((item) => {
+                  if (item.status != null) {
+                    item.status =
+                      BATCH_ITEM_STATUS_MAP[
+                        String(item.status).toLowerCase()
+                      ] || item.status.toUpperCase();
+                  }
+                  return item;
+                });
             }
             return batchData;
           });
@@ -338,6 +372,11 @@ module.exports = {
                     as: 'productionOrderSAP',
                     required: false,
                   },
+                  {
+                    model: OrderType,
+                    as: 'orderType',
+                    required: false,
+                  },
                 ],
               },
               {
@@ -369,6 +408,22 @@ module.exports = {
           ) {
             batchData.productionOrderNumber =
               batchData.productionOrderDetail.productionOrderSAP.productionOrderNumber;
+          }
+          // Add orderType from nested productionOrderDetail
+          if (batchData.productionOrderDetail?.orderType) {
+            batchData.orderType = batchData.productionOrderDetail.orderType;
+          }
+          // Convert WeightSummaryBatchItem status to GraphQL enum format
+          if (batchData.WeightSummaryBatchItems) {
+            batchData.WeightSummaryBatchItems =
+              batchData.WeightSummaryBatchItems.map((item) => {
+                if (item.status != null) {
+                  item.status =
+                    BATCH_ITEM_STATUS_MAP[String(item.status).toLowerCase()] ||
+                    item.status.toUpperCase();
+                }
+                return item;
+              });
           }
 
           return batchData;

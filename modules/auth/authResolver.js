@@ -130,25 +130,11 @@ module.exports = {
           throw new AuthenticationError('User account is inactive');
         }
 
-        // // Compare password
-        // const isPasswordValid = await user.comparePassword(password);
-
-        // if (!isPasswordValid) {
-        //   throw new AuthenticationError('Invalid name or password');
-        // }
-
         if (!user) {
           throw new ApolloError('User not found', apolloErrorCodes.NOT_FOUND);
         }
 
         const token = await authHelper(user, input.password);
-        // Generate JWT token
-        // const token = generateToken({
-        //   userId: user.userId,
-        //   clientId: user.clientId,
-        //   name: user.name,
-        //   email: user.email,
-        // });
 
         // Fetch organization data and attach to user
         const organizationData = await attachOrganizationToUser(user);

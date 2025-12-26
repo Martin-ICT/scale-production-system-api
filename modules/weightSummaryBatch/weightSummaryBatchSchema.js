@@ -111,6 +111,7 @@ module.exports = gql`
     sendToSAP: WeightSummaryBatchSendToSAP
     productionOrderNumber: String
     productionOrderDetail: ProductionOrderDetail
+    orderType: OrderType
     WeightSummaryBatchItems: [WeightSummaryBatchItem]
     createdAt: DateTime!
     updatedAt: DateTime!
