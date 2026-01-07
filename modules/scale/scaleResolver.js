@@ -51,7 +51,7 @@ const STATUS_MAP = {
 const validationSchemas = {
   scaleCreate: Joi.object({
     name: Joi.string().required(),
-    deviceIP: Joi.string().ip().required(),
+    deviceIP: Joi.string().required(),
     deviceId: Joi.string().required(),
     brand: Joi.string().required(),
     plantCode: Joi.string().optional(),
@@ -63,7 +63,7 @@ const validationSchemas = {
   scaleUpdate: Joi.object({
     id: Joi.number().integer().required(),
     name: Joi.string(),
-    deviceIP: Joi.string().ip(),
+    deviceIP: Joi.string(),
     deviceId: Joi.string(),
     brand: Joi.string(),
     plantCode: Joi.string(),

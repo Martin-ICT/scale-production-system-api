@@ -274,6 +274,25 @@ module.exports = {
           }
 
           // Handle scaleId filter through ScaleAssignment -> ProductionOrderDetail -> ProductionOrderSAP
+          // - If scaleId is not passed (undefined): show all results
+          // - If scaleId is passed but null: return empty results
+          // - If scaleId has a value: filter by that scaleId
+          const scaleIdPassed = filter && 'scaleId' in filter;
+          const scaleIdIsNull = scaleIdPassed && filter.scaleId === null;
+
+          // If scaleId is explicitly passed as null, return empty results
+          if (scaleIdIsNull) {
+            return {
+              productionOrderSAPs: [],
+              meta: {
+                totalItems: 0,
+                pageSize,
+                currentPage: page,
+                totalPages: 0,
+              },
+            };
+          }
+
           let includeOptions = [
             {
               model: ProductionOrderDetail,
